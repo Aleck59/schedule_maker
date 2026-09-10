@@ -1,0 +1,9 @@
+{% if schedule is defined and schedule %}
+<div class="filters no-print">
+  <a class="btn secondary" href="/admin/generate/{{ schedule.id }}">Генерация</a>
+  <a class="btn secondary" href="/admin/board/{{ schedule.id }}">Доска</a>
+  <a class="btn secondary" href="/admin/rules/{{ schedule.id }}">Правила</a>
+  <a class="btn secondary" href="/admin/substitutions/{{ schedule.id }}">Замены</a>
+  <a class="btn secondary" href="/admin/reports/{{ schedule.id }}">Отчёты</a>
+</div>
+{% endif %}

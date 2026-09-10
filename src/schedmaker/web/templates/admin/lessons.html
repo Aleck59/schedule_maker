@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Нагрузка{% endblock %}
+{% block nav %}<a href="/admin">Панель</a><a href="/admin/groups">Группы</a>
+<a href="/admin/teachers">Преподаватели</a><a href="/admin/rooms">Аудитории</a>
+<a href="/admin/import">Импорт</a><a href="/admin/logout">Выйти</a>{% endblock %}
+{% block content %}
+<h1>Нагрузка (учебный план)</h1>
+<p class="subtitle">Одна строка — одно требование: столько-то пар дисциплины такой-то группе
+  с таким-то преподавателем. Когда и где — решит генерация.</p>
+
+<div class="panel">
+  <form method="post" action="/admin/lessons" class="inline">
+    {% if editing %}<input type="hidden" name="id" value="{{ editing.id }}">{% endif %}
+    <div><label>Дисциплина</label><input type="text" name="discipline_name" required style="min-width:200px"
+      value="{{ disciplines[editing.discipline_id].name if editing and editing.discipline_id in disciplines else '' }}"></div>
+    <div><label>Группа</label><select name="group_id">
+      {% for g in groups.values() %}<option value="{{ g.id }}"
+        {% if editing and editing.group_id == g.id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}</select></div>
+    <div><label>Преподаватель</label><select name="teacher_id">
+      {% for t in teachers.values() %}<option value="{{ t.id }}"
+        {% if editing and editing.teacher_id == t.id %}selected{% endif %}>{{ t.full_name }}</option>{% endfor %}</select></div>
+    <div><label>Вид</label><select name="lesson_type">
+      {% for value, title in [('lecture','лекция'),('practice','практика'),('lab','лабораторная')] %}
+        <option value="{{ value }}" {% if editing and editing.lesson_type == value %}selected{% endif %}>{{ title }}</option>
+      {% endfor %}</select></div>
+    <div><label>Пар всего</label><input type="number" name="pairs_total" min="1" style="min-width:90px"
+      value="{{ editing.pairs_total if editing else 2 }}"></div>
+    <div><label>Не более в день</label><input type="number" name="max_per_day" min="1" max="4" style="min-width:100px"
+      value="{{ editing.max_per_day if editing else 2 }}"></div>
+    <div><label>Строго с</label><input type="time" name="required_start" style="min-width:110px"
+      value="{{ editing.required_start.strftime('%H:%M') if editing and editing.required_start else '' }}"></div>
+    <div><label>Тип аудитории</label><select name="required_room_kind">
+      <option value="">любая</option>
+      {% for value, title in kinds %}<option value="{{ value }}"
+        {% if editing and editing.required_room_kind == value %}selected{% endif %}>{{ title }}</option>{% endfor %}</select></div>
+    <div><label>Филиал</label><select name="location_id">
+      {% for loc in locations %}<option value="{{ loc.id }}"
+        {% if editing and editing.location_id == loc.id %}selected{% endif %}>{{ loc.city }}</option>{% endfor %}</select></div>
+    <div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="is_online" value="true"
+      {% if editing and editing.is_online %}checked{% endif %}> дистанционно</label></div>
+    <div><button type="submit">{{ 'Сохранить' if editing else 'Добавить' }}</button>
+      {% if editing %}<a class="btn secondary" href="/admin/lessons">Отмена</a>{% endif %}</div>
+  </form>
+</div>
+
+<table class="data">
+  <thead><tr><th>Дисциплина</th><th>Группа</th><th>Преподаватель</th><th>Вид</th>
+    <th>Пар</th><th>В день</th><th>Требования</th><th></th></tr></thead>
+  <tbody>{% for x in rows %}
+    <tr>
+      <td>{{ disciplines[x.discipline_id].name if x.discipline_id in disciplines else '—' }}</td>
+      <td>{{ groups[x.group_id].name if x.group_id in groups else '—' }}</td>
+      <td>{{ teachers[x.teacher_id].full_name if x.teacher_id in teachers else '—' }}</td>
+      <td>{{ {'lecture':'лекция','practice':'практика','lab':'лабораторная'}[x.lesson_type] }}</td>
+      <td>{{ x.pairs_total }}</td><td>{{ x.max_per_day }}</td>
+      <td>
+        {% if x.required_start %}<span class="tag">с {{ x.required_start.strftime('%H:%M') }}</span>{% endif %}
+        {% if x.required_room_kind %}<span class="tag">{% for v,t in kinds %}{% if v == x.required_room_kind %}{{ t }}{% endif %}{% endfor %}</span>{% endif %}
+        {% if x.is_online %}<span class="tag">онлайн</span>{% endif %}
+      </td>
+      <td><a href="/admin/lessons?edit={{ x.id }}">изменить</a>
+        <form method="post" action="/admin/lessons/{{ x.id }}/delete" style="display:inline">
+          <button class="danger" style="padding:2px 8px;font-size:12px">удалить</button></form></td>
+    </tr>
+  {% endfor %}</tbody>
+</table>
+{% endblock %}

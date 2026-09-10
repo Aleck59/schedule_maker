@@ -1,0 +1,25 @@
+# Пример стороннего расширения для Schedule Maker.
+#
+# Устанавливается отдельно:  pip install -e examples/plugin_template
+# После установки правило само появится на странице «Правила» в панели
+# управления — ядро программы при этом не меняется ни одной строкой.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "my-schedule-rules"
+version = "0.1.0"
+description = "Пример собственного правила для Schedule Maker"
+requires-python = ">=3.11"
+dependencies = ["schedule-maker"]
+
+[project.entry-points."schedmaker.constraints"]
+my_rules = "my_schedule_rules.rules:register"
+
+[project.entry-points."schedmaker.reports"]
+my_reports = "my_schedule_rules.rules:register_reports"
+
+[tool.hatch.build.targets.wheel]
+packages = ["my_schedule_rules"]

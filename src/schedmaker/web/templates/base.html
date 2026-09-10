@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Расписание{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">Расписание</a>
+  <nav>
+    {% block nav %}
+      <a href="/">Смотреть расписание</a>
+      {% if admin %}<a href="/admin">Панель управления</a>{% else %}<a href="/admin/login">Вход</a>{% endif %}
+    {% endblock %}
+  </nav>
+</header>
+
+<main>
+  {% if messages %}
+    {% for m in messages %}<div class="flash {{ m.kind }}">{{ m.text }}</div>{% endfor %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer>
+  <span>Schedule Maker</span>
+  {% block footer %}{% endblock %}
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

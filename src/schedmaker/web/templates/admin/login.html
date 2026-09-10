@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Вход администратора{% endblock %}
+{% block nav %}<a href="/">Расписание</a>{% endblock %}
+{% block content %}
+<div class="panel" style="max-width:420px;margin:40px auto">
+  <h1>Вход администратора</h1>
+  <p class="subtitle">Студентам и преподавателям вход не нужен — расписание открыто по общей ссылке.</p>
+  {% if no_admin %}
+    <div class="flash warn">
+      Учётная запись ещё не создана. Выполните в терминале:<br>
+      <code>schedmaker init-admin --username admin</code>
+    </div>
+  {% endif %}
+  <form method="post" action="/admin/login">
+    <input type="hidden" name="next" value="{{ next }}">
+    <p><label for="u">Логин</label><input id="u" type="text" name="username" required autofocus style="width:100%"></p>
+    <p><label for="p">Пароль</label><input id="p" type="password" name="password" required style="width:100%"></p>
+    <button type="submit">Войти</button>
+  </form>
+</div>
+{% endblock %}

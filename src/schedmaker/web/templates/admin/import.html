@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Импорт нагрузки{% endblock %}
+{% block nav %}<a href="/admin">Панель</a><a href="/admin/lessons">Нагрузка</a><a href="/admin/logout">Выйти</a>{% endblock %}
+{% block content %}
+<h1>Импорт нагрузки из таблицы</h1>
+<p class="subtitle">Строка файла — одно требование учебного плана. Программа сама угадывает,
+  какая колонка чему соответствует, и показывает это до того, как что-либо записать.</p>
+
+<div class="panel">
+  <form method="post" action="/admin/import" enctype="multipart/form-data" class="inline">
+    <div><label>Формат</label><select name="importer_id">
+      {% for i in importers %}<option value="{{ i.id }}">{{ i.title }}</option>{% endfor %}
+    </select></div>
+    <div><label>Файл</label><input type="file" name="file" required accept=".xlsx,.xlsm,.csv"></div>
+    <div><button type="submit">Разобрать файл</button></div>
+  </form>
+  <p class="muted">Ожидаемые колонки: Группа, Курс, Направление, Человек, Дисциплина, Кафедра,
+    Преподаватель, Вид занятия, Пар, Тип аудитории, Начало. Лишние колонки игнорируются.</p>
+</div>
+
+{% if preview %}
+  <h2>Что понято из файла {{ filename }}</h2>
+  {% for p in preview.problems %}<div class="issue error">{{ p }}</div>{% endfor %}
+  {% if not preview.problems %}
+    <div class="flash ok">Все обязательные колонки найдены.</div>
+  {% endif %}
+
+  <h2>Соответствие колонок</h2>
+  <table class="data">
+    <thead><tr><th>Поле программы</th><th>Колонка файла</th></tr></thead>
+    <tbody>{% for field, column in preview.detected_mapping.items() %}
+      <tr><td>{{ field }}</td><td>{{ column }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+
+  <h2>Первые строки</h2>
+  <div class="grid-wrap">
+    <table class="data">
+      <thead><tr>{% for c in preview.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in preview.rows %}
+        <tr>{% for c in preview.columns %}<td>{{ row.get(c, '') }}</td>{% endfor %}</tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  <p class="muted">Предпросмотр ничего не изменил в базе.</p>
+{% endif %}
+{% endblock %}

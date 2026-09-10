@@ -1,0 +1,211 @@
+# Единый рабочий процесс: проверка, публикация сайта для студентов и релиз.
+#
+# На каждый pull request и push выполняются линтер и тесты. На push в main
+# пересобирается и публикуется статический сайт с расписанием. На тег вида
+# v1.2.3 дополнительно собирается .exe для администратора и создаётся релиз.
+name: CI и релиз
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # --------------------------------------------------------------------
+  test:
+    name: Линтер и тесты
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Установка
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,cpsat]"
+
+      - name: Линтер
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Тесты
+        run: pytest --cov=schedmaker --cov-report=term-missing
+
+      - name: Сборка пакета
+        run: |
+          pip install build
+          python -m build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+          retention-days: 7
+
+  # --------------------------------------------------------------------
+  build-site:
+    name: Сайт для студентов
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Установка
+        run: pip install -e .
+
+      - name: Сборка статического сайта
+        # Источник — снимок, который учебная часть кладёт в репозиторий кнопкой
+        # «Снимок для сайта». Если снимка ещё нет, показываем демонстрационное
+        # расписание, чтобы страница не была пустой.
+        run: |
+          if [ -f data/timetable.json ]; then
+            echo "Собираю сайт из data/timetable.json"
+            schedmaker build-site --data data/timetable.json --out site
+          else
+            echo "Снимка нет — собираю демонстрационное расписание"
+            schedmaker --db demo.db demo-data --scenario mahachkala
+            schedmaker --db demo.db generate --publish --time-limit 20
+            schedmaker --db demo.db build-site --out site
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # --------------------------------------------------------------------
+  deploy-pages:
+    name: Публикация на GitHub Pages
+    needs: build-site
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # --------------------------------------------------------------------
+  build-exe:
+    name: Программа для администратора (Windows)
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Установка
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pyinstaller
+
+      - name: Сборка одного файла
+        # Шаблоны и стили не импортируются как модули, поэтому их нужно
+        # положить в сборку явно; точки входа плагинов PyInstaller тоже не
+        # видит сам — отсюда список скрытых импортов.
+        run: >
+          pyinstaller --onefile --name schedmaker
+          --collect-data schedmaker
+          --copy-metadata schedule-maker
+          --hidden-import schedmaker.plugins.builtin.constraints_core
+          --hidden-import schedmaker.plugins.builtin.constraints_teacher
+          --hidden-import schedmaker.plugins.builtin.constraints_lesson
+          --hidden-import schedmaker.plugins.builtin.solver_greedy
+          --hidden-import schedmaker.plugins.builtin.importer_excel
+          --hidden-import schedmaker.plugins.builtin.exporter_ics
+          --hidden-import schedmaker.plugins.builtin.exporter_xlsx
+          --hidden-import schedmaker.plugins.builtin.exporter_html
+          --hidden-import schedmaker.plugins.builtin.report_workload
+          --hidden-import schedmaker.plugins.builtin.report_rooms
+          --hidden-import schedmaker.plugins.builtin.external_manual
+          src/schedmaker/__main__.py
+
+      - name: Проверка сборки
+        run: |
+          dist\schedmaker.exe plugins
+          dist\schedmaker.exe --db check.db demo-data --scenario mahachkala
+          dist\schedmaker.exe --db check.db check
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: schedmaker-windows
+          path: dist/schedmaker.exe
+          retention-days: 7
+
+  # --------------------------------------------------------------------
+  release:
+    name: Релиз
+    needs: [test, build-exe]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: schedmaker-windows
+          path: dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/schedmaker.exe
+          body: |
+            ## Как поставить
+
+            **Администратору (Windows).** Скачайте `schedmaker.exe` и выполните:
+
+            ```
+            schedmaker.exe init-admin --username admin
+            schedmaker.exe demo-data
+            schedmaker.exe serve
+            ```
+
+            Публичное расписание откроется на `http://127.0.0.1:8000/`,
+            панель управления — на `/admin`.
+
+            **Через Python.** `pip install schedule_maker-*.whl`
+            Точный решатель ставится отдельно: `pip install "schedule-maker[cpsat]"`.
+
+            **Студентам и преподавателям** ничего ставить не нужно: расписание
+            публикуется на GitHub Pages и открывается по ссылке.

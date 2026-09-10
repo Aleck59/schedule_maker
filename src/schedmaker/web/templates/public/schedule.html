@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ schedule.name }}{% endblock %}
+{% block content %}
+<h1>{{ schedule.name }}</h1>
+<p class="subtitle">{{ schedule.semester }}</p>
+
+<h2>Группы</h2>
+<div class="cards">
+  {% for g in groups %}
+    <a class="card" href="/s/{{ schedule.id }}/g/{{ g.id }}">
+      <div class="card-title">{{ g.name }}</div>
+      <div class="card-sub">{{ g.course }} курс{% if g.program %} · {{ g.program }}{% endif %}</div>
+    </a>
+  {% endfor %}
+</div>
+
+<h2>Преподаватели</h2>
+<div class="cards">
+  {% for t in teachers %}
+    <a class="card" href="/s/{{ schedule.id }}/t/{{ t.id }}">
+      <div class="card-title">{{ t.short_name }}</div>
+      <div class="card-sub">{{ t.department or "—" }}</div>
+    </a>
+  {% endfor %}
+</div>
+
+<h2>Аудитории</h2>
+<div class="cards">
+  {% for r in rooms %}
+    <a class="card" href="/s/{{ schedule.id }}/r/{{ r.id }}">
+      <div class="card-title">{{ r.name }}</div>
+      <div class="card-sub">{{ r.kind.title_ru }} · {{ r.capacity }} мест</div>
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Генерация расписания{% endblock %}
+{% block nav %}<a href="/admin">Панель</a><a href="/admin/lessons">Нагрузка</a><a href="/admin/logout">Выйти</a>{% endblock %}
+{% block content %}
+<h1>Составление расписания</h1>
+<p class="subtitle">{{ schedule.name }} · поставлено {{ placed }} пар из {{ needed }}</p>
+{% include "admin/_nav.html" %}
+
+<h2>Проверка выполнимости</h2>
+{% if report.ok and not report.warnings %}
+  <div class="flash ok">Препятствий не найдено — расписание можно составлять.</div>
+{% endif %}
+{% for i in report.issues %}
+  <div class="issue {{ 'error' if i.severity.value == 'error' else 'warning' }}">
+    <div><b>{{ i.severity.title_ru }}.</b> {{ i.message }}</div>
+    {% if i.hint %}<div class="hint">{{ i.hint }}</div>{% endif %}
+  </div>
+{% endfor %}
+
+<h2>Запуск</h2>
+<div class="panel">
+  <form method="post" action="/admin/generate/{{ schedule.id }}" class="inline">
+    <div><label>Алгоритм</label><select name="solver_id">
+      {% for s in solvers %}<option value="{{ s.id }}">{{ s.title }}</option>{% endfor %}
+    </select></div>
+    <div><label>Зерно случайности</label><input type="number" name="seed" value="42" style="min-width:100px"></div>
+    <div><label>&nbsp;</label><label style="color:inherit">
+      <input type="checkbox" name="keep_pinned" value="true" checked> не двигать закреплённые пары</label></div>
+    <div><button type="submit" {% if not report.ok %}disabled title="Сначала исправьте ошибки"{% endif %}>
+      Составить расписание</button></div>
+  </form>
+  {% if not report.ok %}
+    <p class="muted">Кнопка недоступна: перечисленные выше ошибки делают расписание невозможным,
+      и запуск перебора ничего не изменит.</p>
+  {% endif %}
+</div>
+
+{% if result %}
+  <h2>Результат: {{ result.solver }}</h2>
+  <div class="panel">
+    <span class="stat"><b>{{ result.placed }}</b><span>пар расставлено</span></span>
+    <span class="stat"><b>{{ result.score_hard }}</b><span>жёстких нарушений</span></span>
+    <span class="stat"><b>{{ result.score_soft }}</b><span>мягких нарушений</span></span>
+    <span class="stat"><b>{{ result.seconds }} с</b><span>время работы</span></span>
+  </div>
+  {% if result.explanations %}
+    <h2>Что не встало и почему</h2>
+    {% for line in result.explanations %}<div class="issue error">{{ line }}</div>{% endfor %}
+  {% endif %}
+  {% if result.log %}<div class="log">{{ result.log|join('\n') }}</div>{% endif %}
+  <p><a class="btn" href="/admin/board/{{ schedule.id }}">Открыть доску и поправить руками</a></p>
+{% endif %}
+{% endblock %}

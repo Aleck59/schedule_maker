@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Плагины{% endblock %}
+{% block nav %}<a href="/admin">Панель</a><a href="/admin/logout">Выйти</a>{% endblock %}
+{% block content %}
+<h1>Подключённые расширения</h1>
+<p class="subtitle">Всё, что делает программу, подключено через точки входа. Свой пакет с правилом,
+  алгоритмом или отчётом появится в этих списках сразу после установки — ядро менять не нужно.</p>
+
+{% if errors %}
+  <h2>Не удалось загрузить</h2>
+  {% for e in errors %}
+    <div class="issue error"><b>{{ e.group }} / {{ e.name }}</b><div class="hint">{{ e.error }}</div></div>
+  {% endfor %}
+  <p class="muted">Программа продолжает работать: сломанный плагин отключается, остальные не страдают.</p>
+{% endif %}
+
+{% for group, items in summary.items() %}
+  <h2>{{ titles.get(group, group) }} ({{ items|length }})</h2>
+  {% if items %}
+    <table class="data">
+      <thead><tr><th>Название</th><th>Идентификатор</th><th>Модуль</th></tr></thead>
+      <tbody>{% for i in items %}
+        <tr><td>{{ i.title }}</td><td><code>{{ i.id }}</code></td>
+          <td class="muted" style="font-size:12px">{{ i.module }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  {% else %}
+    <p class="muted">Пока ничего не подключено.</p>
+  {% endif %}
+{% endfor %}
+{% endblock %}

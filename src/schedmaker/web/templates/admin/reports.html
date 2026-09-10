@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Отчёты{% endblock %}
+{% block nav %}<a href="/admin">Панель</a><a href="/admin/logout">Выйти</a>{% endblock %}
+{% block content %}
+<h1>Отчёты</h1>
+<p class="subtitle">Список отчётов собран из плагинов — свой отчёт добавляется отдельным пакетом.</p>
+{% include "admin/_nav.html" %}
+
+<div class="filters">
+  {% for r in reports %}
+    <a class="btn {{ '' if current == r.id else 'secondary' }}"
+       href="/admin/reports/{{ schedule.id }}?report_id={{ r.id }}">{{ r.title }}</a>
+  {% endfor %}
+  <a class="btn secondary" href="/admin/export/{{ schedule.id }}/xlsx">Расписание в Excel</a>
+  <a class="btn secondary" href="/admin/export/{{ schedule.id }}/html">Печать / PDF</a>
+</div>
+
+{% if table %}
+  <h2>{{ table.title }}</h2>
+  {% for n in table.notes %}<div class="flash ok">{{ n }}</div>{% endfor %}
+  <div class="grid-wrap">
+    <table class="data">
+      <thead><tr>{% for c in table.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in table.rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <p class="no-print"><button class="secondary" onclick="window.print()">Печать</button></p>
+{% else %}
+  <div class="panel"><p class="muted">Выберите отчёт.</p></div>
+{% endif %}
+{% endblock %}
