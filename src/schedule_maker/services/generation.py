@@ -166,7 +166,6 @@ def _summary(solution: Solution) -> str:
     return ", ".join(parts) + "."
 
 
-
 def run_in_background(run_id: int) -> threading.Thread:
     """Запустить генерацию в отдельном потоке, чтобы страница не висела."""
     thread = threading.Thread(target=run_generation, args=(run_id,), daemon=True)

@@ -17,7 +17,7 @@
     {% elif run.status == 'failed' %}
       <div class="alert alert-danger">{{ ui.icon('alert-triangle') }} {{ run.message }}</div>
     {% else %}
-      <div class="alert alert-{{ 'success' if run.hard_score == 0 and run.unplaced == 0 else 'warning' }}">
+      <div class="alert sm-alert-block alert-{{ 'success' if run.hard_score == 0 and run.unplaced == 0 else 'warning' }}">
         <h4 class="alert-title">{{ run.message }}</h4>
         <div class="text-secondary">
           Счёт: {{ run.hard_score }} жёстких / {{ run.soft_score }} мягких.

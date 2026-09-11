@@ -346,3 +346,23 @@ def _demand_of(client, teacher_surname: str) -> int:
 
 def _assignments(session: Session) -> list[Assignment]:
     return list(session.scalars(select(Assignment)))
+
+
+def test_итог_генерации_виден_на_странице_конструктора(admin_client, session: Session):
+    """После перезагрузки страницы результат должен остаться на виду."""
+    admin_client.post(
+        "/admin/builder/generate",
+        data={
+            "solver_key": "solver.greedy",
+            "seed": "5",
+            "time_limit": "20",
+            "csrf_token": csrf_of(admin_client),
+        },
+    )
+    run = wait_for_generation(session)
+    assert run.status == "done"
+
+    page = admin_client.get("/admin/builder").text
+    assert 'id="run-status"' in page
+    assert run.message in page
+    assert "рассмотренных вариантов" in page, "статистика отказов должна быть на странице"

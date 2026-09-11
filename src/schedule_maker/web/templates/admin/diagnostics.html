@@ -6,7 +6,7 @@
   <a href="/admin/builder" class="btn btn-primary">{{ ui.icon('player-play') }} К генерации</a>
 {% endcall %}
 
-<div class="alert alert-{{ 'success' if report.ok and not report.warnings else ('danger' if not report.ok else 'warning') }}">
+<div class="alert sm-alert-block alert-{{ 'success' if report.ok and not report.warnings else ('danger' if not report.ok else 'warning') }}">
   <h4 class="alert-title">{{ report.summary }}</h4>
   {% if report.ok %}
     <div class="text-secondary">

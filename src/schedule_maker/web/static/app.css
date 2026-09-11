@@ -101,3 +101,8 @@
 .list-group-item > .icon { margin-right: .375rem; }
 .btn-icon .icon,
 .navbar-brand .icon { margin-right: 0; }
+
+/* В Tabler .alert — flex-контейнер: так иконка становится в строку с текстом.
+   Когда внутри нужен именно столбик (заголовок, пояснение, подробности),
+   помечаем блок этим классом. */
+.alert.sm-alert-block { display: block; }

@@ -58,12 +58,12 @@
   </div>
 </div>
 
-{% if last_run and last_run.status in ('pending', 'running') %}
-  <div id="run-status" hx-get="/admin/builder/run/{{ last_run.id }}" hx-trigger="load, every 1s" hx-swap="outerHTML">
-    <div class="alert alert-info">Генерация запущена…</div>
-  </div>
-{% elif last_run %}
-  {% include "admin/_run_status.html" %}
+{% if last_run %}
+  {# Шаблон блока ждёт переменные run и finished — он же обслуживает опрос
+     прогресса по HTMX, где они приходят из обработчика. #}
+  {% with run = last_run, finished = last_run.status in ('done', 'failed') %}
+    {% include "admin/_run_status.html" %}
+  {% endwith %}
 {% endif %}
 
 {% include "admin/_builder_grid.html" %}
