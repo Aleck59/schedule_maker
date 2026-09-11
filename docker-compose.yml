@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      SM_DATABASE_URL: sqlite:////data/schedule.db
+      SM_SECRET_KEY: ${SM_SECRET_KEY:-change-me-in-production}
+      SM_SEED_DEMO: "1"
+    volumes:
+      - schedule-data:/data
+    restart: unless-stopped
+
+volumes:
+  schedule-data:
