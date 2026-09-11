@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from schedule_maker.domain import Diagnostic, Problem
+from schedule_maker.enums import plural
 from schedule_maker.plugins.registry import PluginRegistry
 from schedule_maker.services.problem_builder import build_problem
 from schedule_maker.services.rules import RuleEngine, make_engine
@@ -45,9 +46,18 @@ class FeasibilityReport:
             return "Проверка пройдена: препятствий не найдено."
         parts = []
         if self.errors:
-            parts.append(f"блокирующих ошибок — {len(self.errors)}")
+            parts.append(
+                plural(
+                    len(self.errors),
+                    "блокирующая ошибка",
+                    "блокирующие ошибки",
+                    "блокирующих ошибок",
+                )
+            )
         if self.warnings:
-            parts.append(f"предупреждений — {len(self.warnings)}")
+            parts.append(
+                plural(len(self.warnings), "предупреждение", "предупреждения", "предупреждений")
+            )
         return "Найдено: " + ", ".join(parts) + "."
 
     def by_subject(self) -> dict[str, list[Diagnostic]]:

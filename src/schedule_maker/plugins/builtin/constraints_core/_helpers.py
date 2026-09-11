@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from schedule_maker.domain import DemandInfo, Placement, Problem, Timetable
-from schedule_maker.enums import DAY_SHORT, WeekParity
+from schedule_maker.enums import DAY_SHORT, WeekParity, plural
 
 
 def others_at(timetable: Timetable, placement: Placement) -> Iterator[Placement]:
@@ -45,18 +45,6 @@ def windows_in_day(indexes: list[int]) -> int:
     if len(indexes) < 2:
         return 0
     return indexes[-1] - indexes[0] + 1 - len(indexes)
-
-
-def plural(n: int, one: str, few: str, many: str) -> str:
-    """Русское склонение числительного: 1 пара, 2 пары, 5 пар."""
-    if 11 <= n % 100 <= 14:
-        return f"{n} {many}"
-    last = n % 10
-    if last == 1:
-        return f"{n} {one}"
-    if last in (2, 3, 4):
-        return f"{n} {few}"
-    return f"{n} {many}"
 
 
 def plural_pairs(n: int) -> str:

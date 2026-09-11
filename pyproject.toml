@@ -85,5 +85,9 @@ disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Корень проекта в пути импорта: тесты берут помощников из tests.factories,
+# а консольная команда pytest, в отличие от «python -m pytest», сама его
+# туда не добавляет.
+pythonpath = ["."]
 addopts = "-q"
 filterwarnings = ["ignore::DeprecationWarning"]

@@ -11,7 +11,9 @@
   <div class="d-flex">
     <div>{{ ui.icon('alert-triangle') }}</div>
     <div class="ms-2">
-      <h4 class="alert-title">Расписание не сойдётся: {{ report.errors|length }} блокирующих ошибок</h4>
+      <h4 class="alert-title">
+        Расписание не сойдётся: {{ plural(report.errors|length, "блокирующая ошибка", "блокирующие ошибки", "блокирующих ошибок") }}
+      </h4>
       <div class="text-secondary">
         Генератор запустится, но часть пар останется нерасставленной.
         <a href="/admin/diagnostics">Посмотреть, что именно мешает</a>.
@@ -21,7 +23,7 @@
 </div>
 {% elif report.warnings %}
 <div class="alert alert-warning">
-  {{ ui.icon('info-circle') }} Предупреждений: {{ report.warnings|length }}.
+  {{ ui.icon('info-circle') }} {{ plural(report.warnings|length, "предупреждение", "предупреждения", "предупреждений") }}.
   <a href="/admin/diagnostics">Подробности</a>.
 </div>
 {% endif %}

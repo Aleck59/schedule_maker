@@ -23,6 +23,7 @@ from schedule_maker.enums import (
     ROLE_LABELS,
     ROOM_KIND_LABELS,
     STUDY_FORM_LABELS,
+    plural,
 )
 from schedule_maker.plugins.registry import get_registry
 
@@ -51,6 +52,7 @@ def get_templates() -> Jinja2Templates:
             parity_labels=PARITY_LABELS,
             delivery_labels=DELIVERY_LABELS,
             role_labels=ROLE_LABELS,
+            plural=plural,
         )
         _templates = templates
     return _templates

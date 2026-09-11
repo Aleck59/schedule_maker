@@ -175,3 +175,15 @@ ROLE_LABELS: dict[str, str] = {
     UserRole.EDITOR: "Диспетчер",
     UserRole.TEACHER: "Преподаватель",
 }
+
+
+def plural(n: int, one: str, few: str, many: str) -> str:
+    """Русское склонение числительного: 1 ошибка, 2 ошибки, 5 ошибок."""
+    if 11 <= n % 100 <= 14:
+        return f"{n} {many}"
+    last = n % 10
+    if last == 1:
+        return f"{n} {one}"
+    if last in (2, 3, 4):
+        return f"{n} {few}"
+    return f"{n} {many}"
