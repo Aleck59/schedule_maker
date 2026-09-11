@@ -1,10 +1,10 @@
 """Точки-события. Плагин подписывается декоратором и вмешивается в ход работы.
 
-    from schedule_maker.plugins.hooks import hook
+from schedule_maker.plugins.hooks import hook
 
-    @hook("after_generate")
-    def notify(solution, version_id, **_):
-        ...
+@hook("after_generate")
+def notify(solution, version_id, **_):
+    ...
 """
 
 from __future__ import annotations

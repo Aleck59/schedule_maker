@@ -11,6 +11,8 @@ build/
 .coverage
 htmlcov/
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
 data/
 .env

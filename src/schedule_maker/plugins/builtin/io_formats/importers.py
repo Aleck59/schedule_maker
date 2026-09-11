@@ -37,8 +37,12 @@ def _rows(raw: bytes) -> list[list[Any]]:
 
     book = load_workbook(io.BytesIO(raw), data_only=True)
     sheet = book.active
+    if sheet is None:  # pragma: no cover - книга без листов
+        return []
     return [
-        list(row) for row in sheet.iter_rows(values_only=True) if any(v is not None for v in row)
+        list(row)
+        for row in sheet.iter_rows(values_only=True)
+        if any(value is not None for value in row)
     ]
 
 

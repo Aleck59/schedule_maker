@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -84,10 +86,29 @@ def _slugify(value: str) -> str:
     return "".join(ch for ch in out if ch.isalnum() or ch == "-").strip("-") or "item"
 
 
+def _unique_slug(session: Session, model: Any, base: str, item_id: int | None) -> str:
+    """Свободный адрес страницы: «bio-101», при совпадении «bio-101-2»."""
+    slug, counter = base, 1
+    while True:
+        query = select(model.id).where(model.slug == slug)
+        if item_id is not None:
+            query = query.where(model.id != item_id)
+        if session.scalar(query.limit(1)) is None:
+            return slug
+        counter += 1
+        slug = f"{base}-{counter}"
+
+
 def _ensure_slug(session: Session, item, values: dict) -> None:
-    if not getattr(item, "slug", ""):
-        item.slug = _slugify(values.get("name") or values.get("full_name") or str(item.id))
-        session.flush()
+    """Проставить адрес страницы до записи в базу.
+
+    Колонка обязательная, поэтому заполнить её нужно раньше INSERT — иначе
+    создание записи через форму падает.
+    """
+    if getattr(item, "slug", ""):
+        return
+    base = _slugify(values.get("name") or values.get("full_name") or "item")
+    item.slug = _unique_slug(session, type(item), base, getattr(item, "id", None))
 
 
 def _sync_subgroups(session: Session, group: StudentGroup, values: dict) -> None:
@@ -96,7 +117,6 @@ def _sync_subgroups(session: Session, group: StudentGroup, values: dict) -> None
     Группа без деления подгрупп не имеет вовсе — именно это правило действует
     у биологов и именно оно потом не даёт разбить поток на части.
     """
-    _ensure_slug(session, group, values)
     wanted = group.subgroup_count if group.split_flag else 0
     existing = {s.index: s for s in group.subgroups}
     for index in range(1, wanted + 1):
@@ -120,7 +140,7 @@ CAMPUS = CrudSpec(
     model=Campus,
     order_by="name",
     icon="map-pin",
-    after_save=_ensure_slug,
+    prepare=_ensure_slug,
     fields=[
         Field("name", "Название", required=True, help="Например: Махачкала"),
         Field("address", "Адрес"),
@@ -216,6 +236,7 @@ GROUP = CrudSpec(
     model=StudentGroup,
     order_by="name",
     icon="users",
+    prepare=_ensure_slug,
     after_save=_sync_subgroups,
     fields=[
         Field("name", "Название", required=True, help="Например: БИО-101"),

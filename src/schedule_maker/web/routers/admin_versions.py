@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session
 
 from schedule_maker.deps import db_session, require_staff, verify_csrf
@@ -27,11 +29,10 @@ def versions_page(
     request: Request, session: Session = Depends(db_session), user=Depends(require_staff)
 ):
     versions = list_versions(session)
-    counts = dict(
-        session.execute(
-            select(Assignment.version_id, func.count(Assignment.id)).group_by(Assignment.version_id)
-        ).all()
-    )
+    rows: Sequence[Row[tuple[int, int]]] = session.execute(
+        select(Assignment.version_id, func.count(Assignment.id)).group_by(Assignment.version_id)
+    ).all()
+    counts: dict[int, int] = dict(rows)  # type: ignore[arg-type]
     draft = working_version(session)
     session.commit()
     return render(

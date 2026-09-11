@@ -20,7 +20,14 @@ _SessionFactory: sessionmaker[Session] | None = None
 
 
 def _connect_args(url: str) -> dict[str, object]:
-    return {"check_same_thread": False} if url.startswith("sqlite") else {}
+    """Параметры драйвера.
+
+    ``timeout`` важен: генерация идёт в отдельном потоке и пишет в ту же базу,
+    что и веб-запросы. Без ожидания SQLite сразу отвечает «database is locked».
+    """
+    if not url.startswith("sqlite"):
+        return {}
+    return {"check_same_thread": False, "timeout": 30}
 
 
 def get_engine() -> Engine:

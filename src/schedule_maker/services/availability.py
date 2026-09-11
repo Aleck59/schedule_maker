@@ -22,9 +22,7 @@ from schedule_maker.enums import AvailabilityKind, WeekParity
 from schedule_maker.models import TeacherAvailability
 
 
-def _expand(
-    row: TeacherAvailability, days: int, slots: int
-) -> set[tuple[int, int]]:
+def _expand(row: TeacherAvailability, days: int, slots: int) -> set[tuple[int, int]]:
     """Развернуть одну строку доступности в множество слотов."""
     day_range: Iterable[int] = range(days) if row.day_of_week is None else (row.day_of_week,)
     slot_range: Iterable[int] = range(slots) if row.slot_index is None else (row.slot_index,)

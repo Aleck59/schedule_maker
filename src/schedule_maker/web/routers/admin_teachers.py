@@ -26,6 +26,7 @@ from schedule_maker.models import (
 from schedule_maker.services.audit import log_action
 from schedule_maker.services.availability import resolve_availability
 from schedule_maker.services.problem_builder import build_slot_grid
+from schedule_maker.web import forms
 from schedule_maker.web.routers.admin_catalog import _slugify
 from schedule_maker.web.templating import render
 
@@ -131,28 +132,28 @@ async def save_teacher(
     request: Request, session: Session = Depends(db_session), user=Depends(require_staff)
 ):
     form = await request.form()
-    teacher_id = form.get("id")
-    teacher = session.get(Teacher, int(teacher_id)) if teacher_id else None
+    teacher_id = forms.integer(form, "id")
+    teacher = session.get(Teacher, teacher_id) if teacher_id else None
     created = teacher is None
     if teacher is None:
         teacher = Teacher()
         session.add(teacher)
 
-    full_name = str(form.get("full_name", "")).strip()
+    full_name = forms.text(form, "full_name")
     if not full_name:
         return _form(request, session, teacher, "Укажите ФИО.")
 
     teacher.full_name = full_name
-    teacher.department = str(form.get("department", "")).strip()
-    teacher.email = str(form.get("email", "")).strip()
-    teacher.delivery_mode = str(form.get("delivery_mode", DeliveryMode.OFFLINE))
-    teacher.base_campus_id = _int_or_none(form.get("base_campus_id"))
-    teacher.external_source_id = _int_or_none(form.get("external_source_id"))
-    teacher.external_ref = str(form.get("external_ref", "")).strip()
-    teacher.max_pairs_per_day = int(form.get("max_pairs_per_day") or 4)
-    teacher.max_pairs_per_week = int(form.get("max_pairs_per_week") or 24)
-    teacher.note = str(form.get("note", "")).strip()
-    teacher.is_active = form.get("is_active") is not None
+    teacher.department = forms.text(form, "department")
+    teacher.email = forms.text(form, "email")
+    teacher.delivery_mode = forms.text(form, "delivery_mode", DeliveryMode.OFFLINE)
+    teacher.base_campus_id = forms.integer(form, "base_campus_id")
+    teacher.external_source_id = forms.integer(form, "external_source_id")
+    teacher.external_ref = forms.text(form, "external_ref")
+    teacher.max_pairs_per_day = forms.integer(form, "max_pairs_per_day", 4) or 4
+    teacher.max_pairs_per_week = forms.integer(form, "max_pairs_per_week", 24) or 24
+    teacher.note = forms.text(form, "note")
+    teacher.is_active = forms.flag(form, "is_active")
     session.flush()
     if not teacher.slug:
         teacher.slug = _unique_slug(session, _slugify(full_name))
@@ -181,16 +182,16 @@ def _save_availability(session: Session, teacher: Teacher, form) -> None:
     """
     settings = get_settings()
     days, slots = settings.days_per_week, settings.slots_per_day
-    if form.get("availability_present") is None:
+    if not forms.flag(form, "availability_present"):
         return
 
     checked = {
         (day, index)
         for day in range(days)
         for index in range(slots)
-        if form.get(f"av-{day}-{index}") is not None
+        if forms.flag(form, f"av-{day}-{index}")
     }
-    reason = str(form.get("availability_reason", "")).strip()
+    reason = forms.text(form, "availability_reason")
 
     for row in list(teacher.availability):
         session.delete(row)
@@ -249,13 +250,6 @@ def delete_teacher(
     return RedirectResponse(
         "/admin/teachers?ok=Преподаватель удалён", status_code=status.HTTP_303_SEE_OTHER
     )
-
-
-def _int_or_none(value) -> int | None:
-    try:
-        return int(value) if value not in (None, "") else None
-    except (TypeError, ValueError):
-        return None
 
 
 def _unique_slug(session: Session, base: str) -> str:

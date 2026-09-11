@@ -82,7 +82,7 @@ class Stream(Base, TimestampMixin):
     @property
     def size(self) -> int:
         """Суммарный размер потока — с ним сверяется вместимость аудитории."""
-        return sum(m.group.size for m in self.members if m.group)
+        return sum(member.group.size for member in self.members if member.group is not None)
 
 
 class StreamMember(Base):

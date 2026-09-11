@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from schedule_maker.deps import db_session, require_staff, verify_csrf
 from schedule_maker.services.audit import log_action
+from schedule_maker.web import forms
 from schedule_maker.web.templating import render
 
 
@@ -60,6 +61,10 @@ class CrudSpec:
     icon: str = "list"
     subtitle: str = ""
     can_delete: bool = True
+    # Вызывается ДО записи в базу — для значений, без которых INSERT не пройдёт
+    # (например, обязательный slug у новой записи).
+    prepare: Callable[[Session, Any, dict[str, Any]], None] | None = None
+    # Вызывается ПОСЛЕ записи, когда у записи уже есть id.
     after_save: Callable[[Session, Any, dict[str, Any]], None] | None = None
     extra_context: Callable[[Session], dict[str, Any]] | None = field(default=None)
 
@@ -72,22 +77,21 @@ class CrudSpec:
         return f"/admin/{self.slug}"
 
 
-def _coerce(field_def: Field, raw: str | None) -> Any:
+def _read(form: Any, field_def: Field) -> Any:
+    """Достать значение поля из формы и привести к нужному типу."""
     if field_def.kind == "checkbox":
-        return raw is not None
-    if raw is None or raw == "":
+        return forms.flag(form, field_def.name)
+    raw = forms.text(form, field_def.name)
+    if not raw:
         return None if field_def.kind in ("number", "select", "time") else ""
     if field_def.kind == "number":
-        return int(raw)
+        return forms.integer(form, field_def.name)
     if field_def.kind == "time":
-        hours, _, minutes = raw.partition(":")
-        return time(int(hours), int(minutes[:2] or 0))
+        return forms.clock(form, field_def.name)
     if field_def.kind == "select":
-        try:
-            return int(raw)
-        except ValueError:
-            return raw
-    return raw.strip()
+        parsed = forms.integer(form, field_def.name)
+        return parsed if parsed is not None else raw
+    return raw
 
 
 def _options(spec: CrudSpec, session: Session) -> dict[str, list[tuple[Any, str]]]:
@@ -107,7 +111,7 @@ def make_crud_router(spec: CrudSpec) -> APIRouter:
         user=Depends(require_staff),
     ):
         order_column = getattr(spec.model, spec.order_by)
-        items = list(session.scalars(select(spec.model).order_by(order_column)))
+        items: list[Any] = list(session.scalars(select(spec.model).order_by(order_column)))
         options = _options(spec, session)
         context = {
             "spec": spec,
@@ -160,8 +164,8 @@ def make_crud_router(spec: CrudSpec) -> APIRouter:
         user=Depends(require_staff),
     ):
         form = await request.form()
-        item_id = form.get("id")
-        item = session.get(spec.model, int(item_id)) if item_id else None
+        item_id = forms.integer(form, "id")
+        item = session.get(spec.model, item_id) if item_id else None
         created = item is None
         if item is None:
             item = spec.model()
@@ -169,8 +173,7 @@ def make_crud_router(spec: CrudSpec) -> APIRouter:
 
         values: dict[str, Any] = {}
         for field_def in spec.fields:
-            raw = form.get(field_def.name)
-            value = _coerce(field_def, raw if raw is None else str(raw))
+            value = _read(form, field_def)
             if field_def.required and value in (None, ""):
                 return render(
                     request,
@@ -186,6 +189,8 @@ def make_crud_router(spec: CrudSpec) -> APIRouter:
             values[field_def.name] = value
             setattr(item, field_def.name, value)
 
+        if spec.prepare:
+            spec.prepare(session, item, values)
         session.flush()
         if spec.after_save:
             spec.after_save(session, item, values)

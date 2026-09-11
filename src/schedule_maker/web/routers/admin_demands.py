@@ -24,6 +24,7 @@ from schedule_maker.models import (
 )
 from schedule_maker.services.audit import log_action
 from schedule_maker.services.problem_builder import build_slot_grid
+from schedule_maker.web import forms
 from schedule_maker.web.templating import render
 
 router = APIRouter(prefix="/admin/demands", tags=["Учебный план"])
@@ -137,14 +138,14 @@ async def save_demand(
     request: Request, session: Session = Depends(db_session), user=Depends(require_staff)
 ):
     form = await request.form()
-    demand_id = form.get("id")
-    demand = session.get(LessonDemand, int(demand_id)) if demand_id else None
+    demand_id = forms.integer(form, "id")
+    demand = session.get(LessonDemand, demand_id) if demand_id else None
     created = demand is None
     if demand is None:
         demand = LessonDemand()
         session.add(demand)
 
-    target = str(form.get("target", ""))
+    target = forms.text(form, "target")
     if ":" not in target:
         return _form(request, session, demand, "Выберите, кому ставится занятие.")
     kind, raw_id = target.split(":", 1)
@@ -156,20 +157,25 @@ async def save_demand(
     else:
         demand.stream_id = int(raw_id)
 
-    demand.subject_id = int(form.get("subject_id"))
-    demand.teacher_id = int(form.get("teacher_id"))
-    demand.lesson_type = str(form.get("lesson_type", LessonType.PRACTICE))
-    demand.pairs_total = max(1, int(form.get("pairs_total") or 1))
-    demand.pairs_per_day_max = max(1, int(form.get("pairs_per_day_max") or 2))
-    demand.week_parity = str(form.get("week_parity", WeekParity.ANY))
-    demand.delivery_mode = str(form.get("delivery_mode", DeliveryMode.OFFLINE))
-    demand.required_room_kind = str(form.get("required_room_kind", RoomKind.ANY))
-    demand.required_room_id = _int_or_none(form.get("required_room_id"))
-    demand.fixed_slot_index = _int_or_none(form.get("fixed_slot_index"))
-    demand.fixed_day_of_week = _int_or_none(form.get("fixed_day_of_week"))
-    demand.tags = str(form.get("tags", "")).strip()
-    demand.note = str(form.get("note", "")).strip()
-    demand.is_active = form.get("is_active") is not None
+    subject_id = forms.integer(form, "subject_id")
+    teacher_id = forms.integer(form, "teacher_id")
+    if subject_id is None or teacher_id is None:
+        return _form(request, session, demand, "Выберите дисциплину и преподавателя.")
+
+    demand.subject_id = subject_id
+    demand.teacher_id = teacher_id
+    demand.lesson_type = forms.text(form, "lesson_type", LessonType.PRACTICE)
+    demand.pairs_total = max(1, forms.integer(form, "pairs_total", 1) or 1)
+    demand.pairs_per_day_max = max(1, forms.integer(form, "pairs_per_day_max", 2) or 2)
+    demand.week_parity = forms.text(form, "week_parity", WeekParity.ANY)
+    demand.delivery_mode = forms.text(form, "delivery_mode", DeliveryMode.OFFLINE)
+    demand.required_room_kind = forms.text(form, "required_room_kind", RoomKind.ANY)
+    demand.required_room_id = forms.integer(form, "required_room_id")
+    demand.fixed_slot_index = forms.integer(form, "fixed_slot_index")
+    demand.fixed_day_of_week = forms.integer(form, "fixed_day_of_week")
+    demand.tags = forms.text(form, "tags")
+    demand.note = forms.text(form, "note")
+    demand.is_active = forms.flag(form, "is_active")
 
     session.flush()
     log_action(
@@ -196,10 +202,3 @@ def delete_demand(
     return RedirectResponse(
         "/admin/demands?ok=Строка удалена", status_code=status.HTTP_303_SEE_OTHER
     )
-
-
-def _int_or_none(value) -> int | None:
-    try:
-        return int(value) if value not in (None, "") else None
-    except (TypeError, ValueError):
-        return None

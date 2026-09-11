@@ -247,11 +247,21 @@ class TeacherMaxDaily(ConstraintPlugin):
         return out
 
 
+class TeacherMaxDailyParams(BaseModel):
+    max_pairs: int | None = Field(
+        None,
+        ge=1,
+        le=12,
+        title="Максимум пар в день",
+        description="Пусто — берётся значение из карточки преподавателя",
+    )
+
+
 class MaxDailyParams(BaseModel):
     max_pairs: int = Field(4, ge=1, le=12, title="Максимум пар в день")
 
 
-TeacherMaxDaily.params_model = MaxDailyParams
+TeacherMaxDaily.params_model = TeacherMaxDailyParams
 
 
 class GroupMaxDaily(ConstraintPlugin):

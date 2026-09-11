@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from schedule_maker.config import get_settings
@@ -78,9 +78,9 @@ def sync_source(session: Session, source: ExternalSource) -> SyncResult:
     _labels, grid = build_slot_grid(session, settings.days_per_week, settings.slots_per_day)
     match_by = str((source.config or {}).get("match_by", "email"))
 
-    for row in list(source.busy_slots):
-        session.delete(row)
-    session.flush()
+    # Чистим запросом, а не через связь: коллекция могла устареть.
+    session.execute(delete(ExternalBusy).where(ExternalBusy.source_id == source.id))
+    session.expire(source, ["busy_slots"])
 
     result = SyncResult()
     for slot in slots:

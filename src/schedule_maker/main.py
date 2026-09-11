@@ -61,9 +61,7 @@ def _maybe_seed() -> None:
         with session_scope() as session:
             credentials = seed_demo(session)
         if credentials:
-            log.warning(
-                "Демо-данные загружены. Администратор: admin / %s", credentials["admin"]
-            )
+            log.warning("Демо-данные загружены. Администратор: admin / %s", credentials["admin"])
     except Exception:  # pragma: no cover - не должно ронять запуск
         log.exception("Не удалось загрузить демо-данные")
 

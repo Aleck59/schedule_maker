@@ -53,7 +53,9 @@ class XlsxExporter(ExporterPlugin):
         from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
         book = Workbook()
-        book.remove(book.active)
+        default_sheet = book.active
+        if default_sheet is not None:
+            book.remove(default_sheet)
         thin = Side(style="thin", color="D0D5DD")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
         head_fill = PatternFill("solid", fgColor="F1F5F9")

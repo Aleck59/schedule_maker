@@ -163,12 +163,15 @@ def generate_command(
     with session_scope() as session:
         from schedule_maker.models import GenerationRun
 
-        run = session.get(GenerationRun, run_id)
-        typer.echo(f"Версия «{version_name}»: {run.message}")
-        typer.echo(f"Счёт: {run.hard_score} жёстких / {run.soft_score} мягких")
-        for line in (run.report or {}).get("log", []):
+        finished = session.get(GenerationRun, run_id)
+        if finished is None:  # pragma: no cover - запись только что создавалась
+            typer.echo("Запуск не найден", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Версия «{version_name}»: {finished.message}")
+        typer.echo(f"Счёт: {finished.hard_score} жёстких / {finished.soft_score} мягких")
+        for line in (finished.report or {}).get("log", []):
             typer.echo(f"  {line}")
-        unplaced = (run.report or {}).get("unplaced", [])
+        unplaced = (finished.report or {}).get("unplaced", [])
         if unplaced:
             typer.echo("\nНе удалось разместить:")
             for item in unplaced:

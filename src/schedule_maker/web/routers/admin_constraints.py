@@ -27,6 +27,7 @@ from schedule_maker.models import (
 )
 from schedule_maker.plugins.registry import get_registry
 from schedule_maker.services.audit import log_action
+from schedule_maker.web import forms
 from schedule_maker.web.templating import render
 
 router = APIRouter(prefix="/admin/constraints", tags=["Ограничения"])
@@ -181,7 +182,7 @@ async def save_constraint(
     request: Request, session: Session = Depends(db_session), user=Depends(require_staff)
 ):
     form = await request.form()
-    plugin_key = str(form.get("plugin_key", ""))
+    plugin_key = forms.text(form, "plugin_key")
     plugin = next(
         (p for p in get_registry().constraints(include_disabled=True) if p.key == plugin_key), None
     )
@@ -190,8 +191,8 @@ async def save_constraint(
             "/admin/constraints?err=Неизвестное правило", status_code=status.HTTP_303_SEE_OTHER
         )
 
-    rule_id = form.get("id")
-    rule = session.get(ConstraintRule, int(rule_id)) if rule_id else None
+    rule_id = forms.integer(form, "id")
+    rule = session.get(ConstraintRule, rule_id) if rule_id else None
     created = rule is None
     if rule is None:
         rule = ConstraintRule(plugin_key=plugin_key)
@@ -199,11 +200,14 @@ async def save_constraint(
 
     raw: dict[str, Any] = {}
     for field in form_fields(plugin.params_model):
-        value = form.get(field["name"])
+        name = field["name"]
         if field["kind"] == "checkbox":
-            raw[field["name"]] = value is not None
-        elif value not in (None, ""):
-            raw[field["name"]] = int(value) if field["kind"] == "number" else str(value)
+            raw[name] = forms.flag(form, name)
+            continue
+        value = forms.text(form, name)
+        if not value:
+            continue
+        raw[name] = forms.integer(form, name) if field["kind"] == "number" else value
 
     try:
         params = plugin.params_model(**raw)
@@ -215,11 +219,11 @@ async def save_constraint(
 
     rule.plugin_key = plugin_key
     rule.scope_type = plugin.scope
-    rule.scope_id = _int_or_none(form.get("scope_id"))
+    rule.scope_id = forms.integer(form, "scope_id")
     rule.params = params.model_dump()
-    rule.weight = max(0, min(100, int(form.get("weight") or plugin.default_weight)))
-    rule.enabled = form.get("enabled") is not None
-    rule.note = str(form.get("note", "")).strip()
+    rule.weight = max(0, min(100, forms.integer(form, "weight", plugin.default_weight) or 0))
+    rule.enabled = forms.flag(form, "enabled")
+    rule.note = forms.text(form, "note")
 
     session.flush()
     log_action(
@@ -248,10 +252,3 @@ def delete_constraint(
     return RedirectResponse(
         "/admin/constraints?ok=Правило удалено", status_code=status.HTTP_303_SEE_OTHER
     )
-
-
-def _int_or_none(value) -> int | None:
-    try:
-        return int(value) if value not in (None, "") else None
-    except (TypeError, ValueError):
-        return None

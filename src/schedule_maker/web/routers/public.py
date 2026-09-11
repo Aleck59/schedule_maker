@@ -174,6 +174,7 @@ def _calendar(session: Session, kind: str, subject_id: int, name: str) -> Respon
 
     problem = build_problem(session)
     timetable = load_timetable(session, version.id)
+
     def belongs(placement) -> bool:
         demand = problem.demands.get(placement.demand_id)
         if demand is None:
