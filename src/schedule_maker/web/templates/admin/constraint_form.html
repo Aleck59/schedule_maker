@@ -1,0 +1,95 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Правило · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header(plugin.title if plugin else 'Новое правило', plugin.description if plugin else '', 'Ограничения') }}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    {% if not plugin %}
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Выберите тип правила</h3></div>
+        <div class="list-group list-group-flush">
+          {% for p in plugins %}
+            <a href="/admin/constraints/new?plugin_key={{ p.key }}" class="list-group-item list-group-item-action">
+              <div class="fw-bold">{{ p.title }}</div>
+              <div class="text-secondary small">{{ p.description }}</div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <form method="post" action="/admin/constraints/save">
+        {{ ui.csrf(csrf_token) }}
+        {% if rule %}<input type="hidden" name="id" value="{{ rule.id }}">{% endif %}
+        <input type="hidden" name="plugin_key" value="{{ plugin.key }}">
+        <div class="card">
+          <div class="card-body">
+            {% if scope_options %}
+            <div class="mb-3">
+              <label class="form-label" for="scope_id">{{ scope_label }}</label>
+              <select class="form-select" id="scope_id" name="scope_id">
+                <option value="">— для всех —</option>
+                {% for value, label in scope_options %}
+                  <option value="{{ value }}" {% if rule and rule.scope_id == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small class="form-hint">Правило для конкретного объекта важнее общего.</small>
+            </div>
+            {% endif %}
+
+            {% for f in fields %}
+              <div class="mb-3">
+                {% if f.kind == 'checkbox' %}
+                  <label class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="{{ f.name }}"
+                           {% if params.get(f.name, f.default) %}checked{% endif %}>
+                    <span class="form-check-label">{{ f.label }}</span>
+                  </label>
+                {% else %}
+                  <label class="form-label" for="p-{{ f.name }}">{{ f.label }}</label>
+                  <input class="form-control" id="p-{{ f.name }}" name="{{ f.name }}"
+                         type="{{ 'number' if f.kind == 'number' else 'text' }}"
+                         value="{{ params.get(f.name, f.default) }}"
+                         {% if f.min is not none %}min="{{ f.min }}"{% endif %}
+                         {% if f.max is not none %}max="{{ f.max }}"{% endif %}>
+                {% endif %}
+                {% if f.help %}<small class="form-hint">{{ f.help }}</small>{% endif %}
+              </div>
+            {% endfor %}
+
+            <div class="mb-3">
+              <label class="form-label" for="weight">
+                Вес: <span id="weight-value">{{ rule.weight if rule else plugin.default_weight }}</span>
+              </label>
+              <input type="range" class="form-range" id="weight" name="weight" min="0" max="100" step="5"
+                     value="{{ rule.weight if rule else plugin.default_weight }}"
+                     oninput="document.getElementById('weight-value').textContent = this.value">
+              <small class="form-hint">
+                100 — жёсткое правило, нарушить нельзя. Меньше — мягкое: генератор
+                постарается его соблюсти, но при необходимости отступит.
+              </small>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label" for="note">Комментарий</label>
+              <input class="form-control" id="note" name="note" value="{{ rule.note if rule else '' }}"
+                     placeholder="Зачем это правило">
+            </div>
+
+            <label class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="enabled"
+                     {% if not rule or rule.enabled %}checked{% endif %}>
+              <span class="form-check-label">Правило включено</span>
+            </label>
+          </div>
+          <div class="card-footer d-flex">
+            <a href="/admin/constraints" class="btn btn-link">Отмена</a>
+            <button type="submit" class="btn btn-primary ms-auto">{{ ui.icon('device-floppy') }} Сохранить</button>
+          </div>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

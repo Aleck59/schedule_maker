@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Ошибка {{ code }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="empty">
+  <div class="empty-header">{{ code }}</div>
+  <p class="empty-title">{{ detail }}</p>
+  <div class="empty-action">
+    <a href="/" class="btn btn-primary">{{ ui.icon('arrow-left') }} На главную</a>
+  </div>
+</div>
+{% endblock %}

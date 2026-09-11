@@ -1,0 +1,123 @@
+{% extends "public/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Мой кабинет · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header('Мой кабинет', teacher.full_name, version.name) %}
+  <a href="/t/{{ teacher.slug }}/calendar.ics" class="btn">{{ ui.icon('download') }} В календарь</a>
+{% endcall %}
+
+<div class="row row-cards">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title">Моё расписание</h3>
+        <div class="card-actions">
+          <div class="btn-group">
+            {% for value, label in [('any', 'Все'), ('odd', 'Нечёт.'), ('even', 'Чёт.')] %}
+              <a href="?parity={{ value }}" class="btn btn-sm {% if parity == value %}active{% endif %}">{{ label }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="card-body p-2">
+        {% if grid.is_empty %}
+          {{ ui.empty('Пар пока нет', 'Расписание ещё составляется.') }}
+        {% else %}
+          {% include "partials/grid_readonly.html" %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Моя нагрузка — {{ total_pairs }} пар</h3></div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead><tr><th>Дисциплина</th><th>Кому</th><th>Вид</th><th class="text-center">Пар</th><th>Особенности</th></tr></thead>
+          <tbody>
+            {% for d in demands %}
+            <tr>
+              <td>{{ d.subject.name }}</td>
+              <td>{{ d.target_label }}</td>
+              <td>{{ lesson_type_labels[d.lesson_type] }}</td>
+              <td class="text-center">{{ d.pairs_total }}</td>
+              <td>
+                {% if d.week_parity != 'any' %}{{ ui.badge(parity_labels[d.week_parity], 'yellow') }}{% endif %}
+                {% if d.delivery_mode == 'online' %}{{ ui.badge('онлайн', 'azure') }}{% endif %}
+                {% if d.fixed_slot_index is not none %}{{ ui.badge('пара №' ~ (d.fixed_slot_index + 1), 'red') }}{% endif %}
+              </td>
+            </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-secondary">Нагрузка не назначена.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><h3 class="card-title">Пожелания по дням</h3></div>
+      <form method="post" action="/me/request">
+        {{ ui.csrf(csrf_token) }}
+        <div class="card-body">
+          <p class="text-secondary small">
+            Отметьте, когда вам удобно вести. Это заявка диспетчеру, а не изменение
+            расписания: решение принимает он.
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead>
+                <tr><th></th>{% for d in days %}<th class="text-center small">{{ day_short[d] }}</th>{% endfor %}</tr>
+              </thead>
+              <tbody>
+                {% for s in slots %}
+                <tr>
+                  <th class="small text-secondary" style="white-space:nowrap">{{ s + 1 }} пара</th>
+                  {% for d in days %}
+                    <td class="text-center">
+                      <input class="form-check-input m-0" type="checkbox" name="want-{{ d }}-{{ s }}"
+                             {% if allowed is none or (d, s) in allowed %}checked{% endif %}>
+                    </td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="comment">Комментарий</label>
+            <textarea class="form-control" id="comment" name="comment" rows="2"
+                      placeholder="Например: приезжаю на три дня подряд"></textarea>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary w-100" type="submit">{{ ui.icon('mail') }} Отправить пожелание</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Мои заявки</h3></div>
+      <div class="list-group list-group-flush">
+        {% for r in requests %}
+        <div class="list-group-item py-2">
+          <div class="d-flex">
+            <div class="small text-secondary">{{ r.created_at.strftime('%d.%m.%Y') }}</div>
+            <div class="ms-auto">
+              {% if r.status == 'new' %}{{ ui.badge('на рассмотрении', 'yellow') }}
+              {% elif r.status == 'accepted' %}{{ ui.badge('принято', 'green') }}
+              {% else %}{{ ui.badge('отклонено', 'red') }}{% endif %}
+            </div>
+          </div>
+          {% if r.comment %}<div class="small">{{ r.comment }}</div>{% endif %}
+          {% if r.answer %}<div class="small text-secondary">Ответ: {{ r.answer }}</div>{% endif %}
+        </div>
+        {% else %}
+          <div class="list-group-item text-secondary small">Заявок пока не было.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

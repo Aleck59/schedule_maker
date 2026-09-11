@@ -1,0 +1,8 @@
+{% extends "public/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Кабинет · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.empty('Учётная запись не привязана к карточке преподавателя',
+            'Попросите администратора связать ваш логин с карточкой в разделе «Пользователи».') }}
+<div class="text-center"><a href="/" class="btn btn-primary">К расписанию</a></div>
+{% endblock %}

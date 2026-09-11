@@ -1,0 +1,55 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ spec.title }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header(spec.title, spec.subtitle, "Справочник") %}
+  <a href="{{ spec.base_url }}/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить</a>
+{% endcall %}
+
+<div class="card">
+  {% if items %}
+  <div class="table-responsive">
+    <table class="table table-vcenter card-table table-hover">
+      <thead>
+        <tr>
+          {% for f in spec.list_fields %}<th>{{ f.label }}</th>{% endfor %}
+          <th class="w-1"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          {% for f in spec.list_fields %}
+            <td>
+              {% if f.kind == 'checkbox' %}
+                {% if item[f.name] %}{{ ui.icon('circle-check', 'text-green') }}{% else %}
+                  <span class="text-secondary">—</span>{% endif %}
+              {% elif f.kind == 'select' %}
+                {{ options_labels.get(f.name, {}).get(item[f.name]|string, f.render_value(item)) }}
+              {% else %}
+                {{ f.render_value(item) }}
+              {% endif %}
+            </td>
+          {% endfor %}
+          <td class="text-end">
+            <a href="{{ spec.base_url }}/{{ item.id }}" class="btn btn-sm btn-icon">{{ ui.icon('pencil') }}</a>
+            {% if spec.can_delete %}
+            <form method="post" action="{{ spec.base_url }}/{{ item.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('Удалить запись?')">
+              {{ ui.csrf(csrf_token) }}
+              <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit">{{ ui.icon('trash') }}</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="card-body">
+      {{ ui.empty('Пока пусто', 'Нажмите «Добавить», чтобы создать первую запись.') }}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Учебный план · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header('Учебный план', 'Что, кому и сколько пар нужно поставить.', 'Нагрузка') %}
+  <a href="/admin/demands/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить нагрузку</a>
+{% endcall %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" for="f-group">Группа</label>
+        <select class="form-select" id="f-group" name="group">
+          <option value="">— все —</option>
+          {% for g in groups %}
+            <option value="{{ g.id }}" {% if filter_group == g.id %}selected{% endif %}>{{ g.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="f-teacher">Преподаватель</label>
+        <select class="form-select" id="f-teacher" name="teacher">
+          <option value="">— все —</option>
+          {% for t in teachers %}
+            <option value="{{ t.id }}" {% if filter_teacher == t.id %}selected{% endif %}>{{ t.short_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-primary" type="submit">{{ ui.icon('filter') }} Показать</button>
+        <a href="/admin/demands" class="btn btn-link">Сбросить</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Строк: {{ demands|length }}, пар суммарно: {{ total_pairs }}</h3>
+  </div>
+  {% if demands %}
+  <div class="table-responsive">
+    <table class="table table-vcenter card-table table-hover">
+      <thead>
+        <tr>
+          <th>Дисциплина</th><th>Кому</th><th>Преподаватель</th><th>Вид</th>
+          <th class="text-center">Пар</th><th class="text-center">В день</th>
+          <th>Особенности</th><th class="w-1"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in demands %}
+        <tr {% if not d.is_active %}class="opacity-50"{% endif %}>
+          <td><a href="/admin/demands/{{ d.id }}" class="text-reset">{{ d.subject.name }}</a></td>
+          <td>{{ d.target_label }}</td>
+          <td>{{ d.teacher.short_name }}</td>
+          <td>{{ lesson_type_labels[d.lesson_type] }}</td>
+          <td class="text-center">{{ d.pairs_total }}</td>
+          <td class="text-center">{{ d.pairs_per_day_max }}</td>
+          <td>
+            {% if d.week_parity != 'any' %}{{ ui.badge(parity_labels[d.week_parity], 'yellow') }}{% endif %}
+            {% if d.delivery_mode == 'online' %}{{ ui.badge('онлайн', 'azure') }}{% endif %}
+            {% if d.required_room_kind != 'any' %}{{ ui.badge(room_kind_labels[d.required_room_kind], 'purple') }}{% endif %}
+            {% if d.fixed_slot_index is not none %}{{ ui.badge('пара №' ~ (d.fixed_slot_index + 1), 'red', 'Жёсткий временной слот') }}{% endif %}
+            {% if d.fixed_day_of_week is not none %}{{ ui.badge(day_short[d.fixed_day_of_week], 'red') }}{% endif %}
+            {% if d.stream_id %}{{ ui.badge('поток', 'purple') }}{% endif %}
+            {% for tag in d.tag_list %}{{ ui.badge(tag, 'secondary') }}{% endfor %}
+          </td>
+          <td class="text-end">
+            <a href="/admin/demands/{{ d.id }}" class="btn btn-sm btn-icon">{{ ui.icon('pencil') }}</a>
+            <form method="post" action="/admin/demands/{{ d.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('Удалить строку нагрузки?')">
+              {{ ui.csrf(csrf_token) }}
+              <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit">{{ ui.icon('trash') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="card-body">{{ ui.empty('Нагрузка не задана', 'Добавьте строки учебного плана, чтобы было что расставлять.') }}</div>
+  {% endif %}
+</div>
+{% endblock %}

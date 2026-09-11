@@ -1,0 +1,84 @@
+{% extends "public/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Расписание · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Расписание занятий', version.name if version else 'Расписание ещё не опубликовано') }}
+
+{% if not version %}
+  {{ ui.empty('Расписание пока не опубликовано', 'Как только диспетчер опубликует версию, она появится здесь.') }}
+{% else %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" for="campus">Город</label>
+        <select class="form-select" id="campus" name="campus" onchange="this.form.submit()">
+          <option value="">Все города</option>
+          {% for c in campuses %}
+            <option value="{{ c.id }}" {% if filter_campus == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="course">Курс</label>
+        <select class="form-select" id="course" name="course" onchange="this.form.submit()">
+          <option value="">Все курсы</option>
+          {% for c in courses %}
+            <option value="{{ c }}" {% if filter_course == c %}selected{% endif %}>{{ c }} курс</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <a href="/" class="btn w-100">Сбросить фильтры</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row row-cards">
+  <div class="col-lg-8">
+    {% for faculty, groups in by_faculty.items() %}
+      <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title">{{ faculty }}</h3></div>
+        <div class="card-body">
+          <div class="btn-list">
+            {% for g in groups %}
+              <a href="/g/{{ g.slug }}" class="btn">
+                {{ g.name }}
+                <span class="badge bg-secondary-lt ms-1">{{ g.course }} курс</span>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      {{ ui.empty('Группы не найдены', 'Попробуйте изменить фильтры.') }}
+    {% endfor %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><h3 class="card-title">Преподаватели</h3></div>
+      <div class="card-body" style="max-height: 22rem; overflow-y: auto">
+        <div class="list-group list-group-flush">
+          {% for t in teachers %}
+            <a href="/t/{{ t.slug }}" class="list-group-item list-group-item-action py-2">{{ t.full_name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Аудитории</h3></div>
+      <div class="card-body" style="max-height: 18rem; overflow-y: auto">
+        <div class="btn-list">
+          {% for r in rooms %}
+            <a href="/r/{{ r.id }}" class="btn btn-sm">{{ r.code }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

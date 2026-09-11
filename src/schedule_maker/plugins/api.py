@@ -265,11 +265,17 @@ class ImportResult:
 
 @dataclass(frozen=True, slots=True)
 class BusySlot:
-    """Занятость преподавателя во внешнем учреждении."""
+    """Занятость преподавателя во внешнем учреждении.
+
+    Источник знает только время начала: в какой номер пары оно попадёт,
+    решает уже наша сетка звонков, поэтому ``slot_index`` можно не заполнять,
+    указав вместо него ``start_minutes`` — минуты от полуночи.
+    """
 
     teacher_ref: str
     day_of_week: int
-    slot_index: int
+    slot_index: int = -1
+    start_minutes: int | None = None
     week_parity: str = "any"
     description: str = ""
 

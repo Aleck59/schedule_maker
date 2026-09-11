@@ -1,0 +1,36 @@
+{% extends "public/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ grid.title }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header(grid.title, grid.subtitle, version.name) %}
+  <div class="btn-list">
+    {% if ics_url %}<a href="{{ ics_url }}" class="btn">{{ ui.icon('download') }} В календарь</a>{% endif %}
+    <button class="btn" onclick="window.print()">{{ ui.icon('printer') }} Печать</button>
+  </div>
+{% endcall %}
+
+<div class="card mb-3 d-print-none">
+  <div class="card-body py-2">
+    <div class="btn-group w-100" role="group">
+      {% for value, label in [('any', 'Все недели'), ('odd', 'Нечётная'), ('even', 'Чётная')] %}
+        <a href="?parity={{ value }}" class="btn {% if parity == value %}active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-2">
+    {% if grid.is_empty %}
+      {{ ui.empty('Занятий нет', 'В опубликованной версии для этого фильтра пусто.') }}
+    {% else %}
+      {% include "partials/grid_readonly.html" %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="text-secondary small mt-2">
+  Занятия с пометкой «чёт.» или «нечёт.» проходят через неделю.
+  «Дистанционно» означает, что аудитория не нужна.
+</div>
+{% endblock %}

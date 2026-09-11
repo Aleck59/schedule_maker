@@ -1,0 +1,162 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Нагрузка · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header('Строка нагрузки' if demand else 'Новая строка нагрузки', '', 'Учебный план') %}
+  <a href="/admin/demands" class="btn btn-link">{{ ui.icon('arrow-left') }} К списку</a>
+{% endcall %}
+
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<form method="post" action="/admin/demands/save">
+  {{ ui.csrf(csrf_token) }}
+  {% if demand %}<input type="hidden" name="id" value="{{ demand.id }}">{% endif %}
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title">Основное</h3></div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label" for="subject_id">Дисциплина <span class="text-danger">*</span></label>
+            <select class="form-select" id="subject_id" name="subject_id" required>
+              {% for s in subjects %}
+                <option value="{{ s.id }}" {% if demand and demand.subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="target">Кому <span class="text-danger">*</span></label>
+            <select class="form-select" id="target" name="target" required>
+              <option value="">— выберите —</option>
+              {% for value, label in targets %}
+                <option value="{{ value }}" {% if current_target == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <small class="form-hint">
+              Подгруппы появляются только у групп с включённым делением.
+              Поток — когда лекцию слушают несколько групп сразу.
+            </small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="teacher_id">Преподаватель <span class="text-danger">*</span></label>
+            <select class="form-select" id="teacher_id" name="teacher_id" required>
+              {% for t in teachers %}
+                <option value="{{ t.id }}" {% if demand and demand.teacher_id == t.id %}selected{% endif %}>{{ t.full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="lesson_type">Вид занятия</label>
+            <select class="form-select" id="lesson_type" name="lesson_type">
+              {% for lt in lesson_types %}
+                <option value="{{ lt.value }}" {% if demand and demand.lesson_type == lt.value %}selected{% endif %}>
+                  {{ lesson_type_labels[lt.value] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label" for="pairs_total">Всего пар <span class="text-danger">*</span></label>
+              <input class="form-control" id="pairs_total" name="pairs_total" type="number" min="1" max="60"
+                     value="{{ demand.pairs_total if demand else 2 }}" required>
+            </div>
+            <div class="col-6 mb-3">
+              <label class="form-label" for="pairs_per_day_max">Не больше в день</label>
+              <input class="form-control" id="pairs_per_day_max" name="pairs_per_day_max" type="number" min="1" max="8"
+                     value="{{ demand.pairs_per_day_max if demand else 2 }}">
+              <small class="form-hint">Обычно 2–3.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title">Условия проведения</h3></div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label" for="week_parity">Периодичность</label>
+            <select class="form-select" id="week_parity" name="week_parity">
+              {% for p in parities %}
+                <option value="{{ p.value }}" {% if demand and demand.week_parity == p.value %}selected{% endif %}>
+                  {{ parity_labels[p.value] }}</option>
+              {% endfor %}
+            </select>
+            <small class="form-hint">«Мигающее» расписание для приезжающих через неделю.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="delivery_mode">Формат</label>
+            <select class="form-select" id="delivery_mode" name="delivery_mode">
+              {% for m in delivery_modes %}
+                <option value="{{ m.value }}" {% if demand and demand.delivery_mode == m.value %}selected{% endif %}>
+                  {{ delivery_labels[m.value] }}</option>
+              {% endfor %}
+            </select>
+            <small class="form-hint">Онлайн-паре аудитория не нужна.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="required_room_kind">Требуемый тип аудитории</label>
+            <select class="form-select" id="required_room_kind" name="required_room_kind">
+              {% for k in room_kinds %}
+                <option value="{{ k.value }}" {% if demand and demand.required_room_kind == k.value %}selected{% endif %}>
+                  {{ room_kind_labels[k.value] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="required_room_id">Закрепить аудиторию</label>
+            <select class="form-select" id="required_room_id" name="required_room_id">
+              <option value="">— любая подходящая —</option>
+              {% for r in rooms %}
+                <option value="{{ r.id }}" {% if demand and demand.required_room_id == r.id %}selected{% endif %}>
+                  {{ r.code }} — {{ r.campus.name }} ({{ r.capacity }} мест)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label" for="fixed_day_of_week">Строго в день</label>
+              <select class="form-select" id="fixed_day_of_week" name="fixed_day_of_week">
+                <option value="">— любой —</option>
+                {% for d in days %}
+                  <option value="{{ d }}" {% if demand and demand.fixed_day_of_week == d %}selected{% endif %}>{{ day_names[d] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6 mb-3">
+              <label class="form-label" for="fixed_slot_index">Строго с</label>
+              <select class="form-select" id="fixed_slot_index" name="fixed_slot_index">
+                <option value="">— любое время —</option>
+                {% for index, label in slot_labels.items() %}
+                  <option value="{{ index }}" {% if demand and demand.fixed_slot_index == index %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small class="form-hint">Например, «строго с 16:00».</small>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="tags">Метки</label>
+            <input class="form-control" id="tags" name="tags" value="{{ demand.tags if demand else '' }}"
+                   placeholder="через запятую">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="note">Заметка</label>
+            <textarea class="form-control" id="note" name="note" rows="2">{{ demand.note if demand else '' }}</textarea>
+          </div>
+          <label class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="is_active"
+                   {% if not demand or demand.is_active %}checked{% endif %}>
+            <span class="form-check-label">Учитывать при генерации</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex mb-4">
+    <a href="/admin/demands" class="btn btn-link">Отмена</a>
+    <button type="submit" class="btn btn-primary ms-auto">{{ ui.icon('device-floppy') }} Сохранить</button>
+  </div>
+</form>
+{% endblock %}

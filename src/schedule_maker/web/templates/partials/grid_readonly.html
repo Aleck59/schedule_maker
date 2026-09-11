@@ -1,0 +1,49 @@
+{# Сетка расписания только для чтения: открытый раздел и кабинет преподавателя.
+   На широком экране — таблица «дни × пары», на телефоне — список по дням. #}
+{% import "partials/ui.html" as ui %}
+
+<div class="table-responsive d-none d-md-block">
+  <table class="sm-grid">
+    <thead>
+      <tr>
+        <th class="sm-slot-head"></th>
+        {% for d in grid.days %}<th>{{ day_names[d] }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in grid.visible_slots %}
+      <tr>
+        <th class="sm-slot-head">{{ grid.slot_labels[s] }}</th>
+        {% for d in grid.days %}
+          <td class="sm-cell">
+            {% for item in grid.at(d, s) %}
+              {{ ui.lesson_card(item) }}
+            {% endfor %}
+          </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="d-md-none">
+  {% for d in grid.days %}
+    {% set day_items = grid.day_items(d) %}
+    {% if day_items %}
+      <div class="card sm-day-card">
+        <div class="card-header py-2"><h3 class="card-title">{{ day_names[d] }}</h3></div>
+        <div class="card-body p-2">
+          {% for s, items in day_items %}
+            <div class="sm-day-slot mb-2">
+              <div class="sm-day-time">{{ grid.slot_labels[s] }}</div>
+              <div class="sm-day-body">
+                {% for item in items %}{{ ui.lesson_card(item) }}{% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>

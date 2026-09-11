@@ -1,0 +1,48 @@
+{% import "partials/ui.html" as ui %}
+<div id="run-status"
+     {% if run and not finished %}hx-get="/admin/builder/run/{{ run.id }}" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %}>
+  {% if run %}
+    {% if run.status == 'running' or run.status == 'pending' %}
+      <div class="alert alert-info">
+        <div class="d-flex align-items-center">
+          <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+          <div class="flex-fill">
+            <strong>Генерация идёт…</strong> {{ run.message }}
+            <div class="progress progress-sm mt-2">
+              <div class="progress-bar" style="width: {{ run.progress }}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% elif run.status == 'failed' %}
+      <div class="alert alert-danger">{{ ui.icon('alert-triangle') }} {{ run.message }}</div>
+    {% else %}
+      <div class="alert alert-{{ 'success' if run.hard_score == 0 and run.unplaced == 0 else 'warning' }}">
+        <h4 class="alert-title">{{ run.message }}</h4>
+        <div class="text-secondary">
+          Счёт: {{ run.hard_score }} жёстких / {{ run.soft_score }} мягких.
+          {% if run.finished_at %}Завершено {{ run.finished_at.strftime('%d.%m %H:%M') }}.{% endif %}
+        </div>
+        {% set unplaced = (run.report or {}).get('unplaced', []) %}
+        {% if unplaced %}
+          <details class="mt-2">
+            <summary>Не удалось разместить: {{ unplaced|length }}</summary>
+            <ul class="mt-2 mb-0">
+              {% for item in unplaced %}<li>{{ item.label }}</li>{% endfor %}
+            </ul>
+            <div class="mt-2">
+              Причины — на странице <a href="/admin/diagnostics">диагностики</a>.
+            </div>
+          </details>
+        {% endif %}
+        {% if (run.report or {}).get('log') %}
+          <details class="mt-2">
+            <summary>Журнал генератора</summary>
+            <pre class="sm-mono mt-2 mb-0">{% for line in run.report.log %}{{ line }}
+{% endfor %}</pre>
+          </details>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endif %}
+</div>

@@ -1,0 +1,7 @@
+{% extends "public/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Расписание не опубликовано · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.empty('Расписание ещё не опубликовано', 'Загляните позже — диспетчер пока готовит версию.') }}
+<div class="text-center"><a href="/" class="btn btn-primary">На главную</a></div>
+{% endblock %}

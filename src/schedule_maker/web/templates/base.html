@@ -1,0 +1,55 @@
+{% import "partials/ui.html" as ui %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/vendor/tabler.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+{% include "partials/icons.svg" %}
+<div class="page">
+  {% block sidebar %}{% endblock %}
+  <div class="page-wrapper">
+    {% block header %}{% endblock %}
+    <div class="page-body">
+      <div class="container-xl">
+        {% if request.query_params.get('ok') %}
+          <div class="alert alert-success alert-dismissible" role="alert">
+            {{ ui.icon('circle-check') }} {{ request.query_params.get('ok') }}
+            <a class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></a>
+          </div>
+        {% endif %}
+        {% if request.query_params.get('err') %}
+          <div class="alert alert-danger alert-dismissible" role="alert">
+            {{ ui.icon('alert-triangle') }} {{ request.query_params.get('err') }}
+            <a class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></a>
+          </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+    {% block footer %}
+    <footer class="footer footer-transparent d-print-none">
+      <div class="container-xl">
+        <div class="row text-center align-items-center">
+          <div class="col-12 text-secondary">
+            <a href="/" class="link-secondary">Открытое расписание</a>
+            {% if user and user.is_staff %} · <a href="/admin" class="link-secondary">Админка</a>{% endif %}
+            {% if not user %} · <a href="/login" class="link-secondary">Вход для преподавателей</a>{% endif %}
+          </div>
+        </div>
+      </div>
+    </footer>
+    {% endblock %}
+  </div>
+</div>
+<script src="/static/vendor/tabler.min.js" defer></script>
+<script src="/static/vendor/htmx.min.js" defer></script>
+<script src="/static/vendor/alpine.min.js" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

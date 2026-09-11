@@ -1,0 +1,74 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Версии · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Версии расписания', 'Снимки, публикация и откат. Студенты видят только опубликованную версию.', 'Версии') }}
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-vcenter card-table">
+      <thead>
+        <tr><th>Название</th><th>Семестр</th><th class="text-center">Пар</th><th class="text-center">Счёт</th>
+            <th>Состояние</th><th class="w-1"></th></tr>
+      </thead>
+      <tbody>
+        {% for v in versions %}
+        <tr>
+          <td>
+            <strong>{{ v.name }}</strong>
+            {% if v.id == draft.id %}{{ ui.badge('рабочий черновик', 'blue') }}{% endif %}
+            {% if v.note %}<div class="text-secondary small">{{ v.note }}</div>{% endif %}
+          </td>
+          <td class="text-secondary">{{ v.semester or '—' }}</td>
+          <td class="text-center">{{ counts.get(v.id, 0) }}</td>
+          <td class="text-center">
+            <span class="{% if v.hard_score %}text-danger{% else %}text-green{% endif %}">{{ v.hard_score }}</span>
+            <span class="text-secondary">/ {{ v.soft_score }}</span>
+          </td>
+          <td>
+            {% if v.status == 'published' %}{{ ui.badge('опубликовано', 'green') }}
+            {% elif v.status == 'archived' %}{{ ui.badge('архив', 'secondary') }}
+            {% else %}{{ ui.badge('черновик', 'blue') }}{% endif %}
+            {% if v.published_at %}<div class="text-secondary small">{{ v.published_at.strftime('%d.%m.%Y %H:%M') }}</div>{% endif %}
+          </td>
+          <td class="text-end">
+            <div class="btn-list justify-content-end">
+              {% if v.status != 'published' %}
+                <form method="post" action="/admin/versions/publish" class="d-inline">
+                  {{ ui.csrf(csrf_token) }}<input type="hidden" name="version_id" value="{{ v.id }}">
+                  <button class="btn btn-sm btn-success" type="submit">{{ ui.icon('world') }} Опубликовать</button>
+                </form>
+              {% else %}
+                <form method="post" action="/admin/versions/unpublish" class="d-inline">
+                  {{ ui.csrf(csrf_token) }}<input type="hidden" name="version_id" value="{{ v.id }}">
+                  <button class="btn btn-sm" type="submit">Снять с публикации</button>
+                </form>
+              {% endif %}
+              <form method="post" action="/admin/versions/clone" class="d-inline">
+                {{ ui.csrf(csrf_token) }}
+                <input type="hidden" name="version_id" value="{{ v.id }}">
+                <input type="hidden" name="name" value="Копия «{{ v.name }}»">
+                <button class="btn btn-sm btn-icon" type="submit" title="Сделать снимок">{{ ui.icon('device-floppy') }}</button>
+              </form>
+              {% if v.status != 'published' %}
+              <form method="post" action="/admin/versions/delete" class="d-inline"
+                    onsubmit="return confirm('Удалить версию вместе с расстановкой?')">
+                {{ ui.csrf(csrf_token) }}<input type="hidden" name="version_id" value="{{ v.id }}">
+                <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit">{{ ui.icon('trash') }}</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="alert alert-info mt-3">
+  {{ ui.icon('info-circle') }}
+  Прежде чем крупно менять расписание, сделайте снимок: к нему можно вернуться,
+  если новая расстановка окажется хуже.
+</div>
+{% endblock %}

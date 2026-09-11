@@ -1,0 +1,62 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ spec.title_one }} · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header(spec.title_one if item else 'Новая запись: ' + spec.title_one, '', spec.title) }}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-body">
+        {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+        <form method="post" action="{{ spec.base_url }}/save">
+          {{ ui.csrf(csrf_token) }}
+          {% if item %}<input type="hidden" name="id" value="{{ item.id }}">{% endif %}
+          {% for f in spec.fields %}
+            <div class="mb-3">
+              {% if f.kind == 'checkbox' %}
+                <label class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="{{ f.name }}"
+                         {% if item and item[f.name] %}checked{% elif not item and f.default %}checked{% endif %}>
+                  <span class="form-check-label">{{ f.label }}</span>
+                </label>
+              {% else %}
+                <label class="form-label" for="fld-{{ f.name }}">
+                  {{ f.label }}{% if f.required %} <span class="text-danger">*</span>{% endif %}
+                </label>
+                {% if f.kind == 'select' %}
+                  <select class="form-select" id="fld-{{ f.name }}" name="{{ f.name }}"
+                          {% if f.required %}required{% endif %}>
+                    {% if not f.required %}<option value="">— не задано —</option>{% endif %}
+                    {% for value, label in options.get(f.name, []) %}
+                      <option value="{{ value }}"
+                        {% if item and (item[f.name]|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                {% elif f.kind == 'textarea' %}
+                  <textarea class="form-control" id="fld-{{ f.name }}" name="{{ f.name }}" rows="3"
+                            {% if f.required %}required{% endif %}>{{ f.render_value(item) if item else '' }}</textarea>
+                {% else %}
+                  <input class="form-control" id="fld-{{ f.name }}" name="{{ f.name }}"
+                         type="{{ 'number' if f.kind == 'number' else ('time' if f.kind == 'time' else 'text') }}"
+                         value="{{ f.render_value(item) if item else (f.default if f.default is not none else '') }}"
+                         {% if f.min is not none %}min="{{ f.min }}"{% endif %}
+                         {% if f.max is not none %}max="{{ f.max }}"{% endif %}
+                         {% if f.required %}required{% endif %}>
+                {% endif %}
+              {% endif %}
+              {% if f.help %}<small class="form-hint">{{ f.help }}</small>{% endif %}
+            </div>
+          {% endfor %}
+          <div class="d-flex">
+            <a href="{{ spec.base_url }}" class="btn btn-link">Отмена</a>
+            <button type="submit" class="btn btn-primary ms-auto">
+              {{ ui.icon('device-floppy') }} Сохранить
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+/* Собственные стили поверх Tabler. Всё, что не покрывается готовыми классами. */
+
+:root {
+  --sm-cell-min-height: 84px;
+  --sm-grid-border: var(--tblr-border-color);
+}
+
+/* ---------- Карточка пары ---------- */
+
+.sm-lesson {
+  border-radius: var(--tblr-border-radius);
+  padding: .35rem .5rem;
+  margin-bottom: .25rem;
+  font-size: .8125rem;
+  line-height: 1.25;
+  position: relative;
+}
+
+.sm-lesson-title { font-weight: 600; }
+.sm-lesson-meta { color: var(--tblr-secondary); font-size: .75rem; }
+.sm-lesson-badges { display: flex; flex-wrap: wrap; gap: .15rem; margin-top: .2rem; }
+.sm-lesson-badges .badge { font-size: .625rem; padding: .1rem .3rem; }
+
+.sm-draggable { cursor: grab; }
+.sm-draggable:active { cursor: grabbing; }
+.sm-lesson.sm-locked { box-shadow: inset 0 0 0 1px var(--tblr-dark); }
+.sm-lesson[data-conflict] { outline: 2px solid var(--tblr-danger); outline-offset: 1px; }
+
+/* ---------- Сетка расписания ---------- */
+
+.sm-grid {
+  width: 100%;
+  min-width: 860px; /* иначе на узком экране колонки схлопываются в столбик букв */
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+.sm-grid th,
+.sm-grid td { border: 1px solid var(--sm-grid-border); vertical-align: top; padding: .25rem; }
+.sm-grid thead th { background: var(--tblr-bg-surface-secondary); text-align: center; font-size: .8125rem; }
+.sm-grid .sm-slot-head {
+  width: 96px;
+  background: var(--tblr-bg-surface-secondary);
+  font-size: .6875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: normal;
+}
+.sm-cell { min-height: var(--sm-cell-min-height); height: var(--sm-cell-min-height); }
+
+/* Подсветка при перетаскивании: куда можно, куда нельзя. */
+.sm-cell.sm-allowed { background: var(--tblr-success-lt); }
+.sm-cell.sm-forbidden { background: var(--tblr-danger-lt); opacity: .55; }
+.sm-cell.sm-over { outline: 2px dashed var(--tblr-primary); outline-offset: -2px; }
+
+.sm-pool { max-height: 70vh; overflow-y: auto; }
+.sm-pool:empty::after {
+  content: "Все пары расставлены";
+  display: block;
+  padding: 1rem;
+  color: var(--tblr-secondary);
+  text-align: center;
+}
+
+.sm-dragging { opacity: .4; }
+
+/* ---------- Печать ---------- */
+
+@media print {
+  .sm-grid { font-size: 10pt; }
+  .sm-lesson { break-inside: avoid; }
+  .page-wrapper { margin: 0; }
+}
+
+/* ---------- Мелочи ---------- */
+
+.sm-diagnostic-hint { font-size: .8125rem; }
+.sm-mono { font-family: var(--tblr-font-monospace); font-size: .8125rem; }
+.sm-sticky-head thead th { position: sticky; top: 0; z-index: 2; }
+
+/* ---------- Расписание на телефоне ---------- */
+
+/* Таблица на узком экране нечитаема, поэтому там показывается список по дням. */
+.sm-day-card + .sm-day-card { margin-top: .75rem; }
+.sm-day-card .sm-day-slot { display: flex; gap: .5rem; align-items: flex-start; }
+.sm-day-card .sm-day-time {
+  flex: 0 0 5.5rem;
+  font-size: .75rem;
+  color: var(--tblr-secondary);
+  padding-top: .35rem;
+}
+.sm-day-card .sm-day-body { flex: 1 1 auto; min-width: 0; }
+
+/* Иконка в кнопке или ссылке не должна прилипать к тексту.
+   Псевдокласс :only-child здесь не подходит: текст рядом с иконкой — это
+   текстовый узел, а не элемент, так что кнопка с подписью тоже под него
+   попадает. Поэтому кнопки без подписи помечаются классом btn-icon. */
+.btn .icon,
+.nav-link .icon,
+.alert > .icon,
+.list-group-item > .icon { margin-right: .375rem; }
+.btn-icon .icon,
+.navbar-brand .icon { margin-right: 0; }

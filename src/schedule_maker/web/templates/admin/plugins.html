@@ -1,0 +1,58 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Плагины · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Плагины', 'Установлено ' ~ total ~ '. Отключение сразу меняет поведение генератора.', 'Расширения') }}
+
+{% for kind, rows in groups.items() %}
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">{{ kind_labels.get(kind, kind) }}</h3></div>
+  <div class="table-responsive">
+    <table class="table table-vcenter card-table">
+      <thead><tr><th>Название</th><th>Что делает</th><th>Ключ</th><th class="w-1">Включён</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <strong>{{ row.record.manifest.name }}</strong>
+            {% if row.record.manifest.builtin %}{{ ui.badge('встроенный', 'secondary') }}{% endif %}
+            {% if not row.can_disable %}{{ ui.badge('базовая проверка', 'blue', 'Работает всегда') }}{% endif %}
+            {% if row.record.manifest.version %}
+              <div class="text-secondary small">версия {{ row.record.manifest.version }}</div>
+            {% endif %}
+          </td>
+          <td class="text-secondary">{{ row.record.manifest.description }}</td>
+          <td class="sm-mono text-secondary">{{ row.record.key }}</td>
+          <td>
+            <form method="post" action="/admin/plugins/toggle">
+              {{ ui.csrf(csrf_token) }}
+              <input type="hidden" name="plugin_key" value="{{ row.record.key }}">
+              <input type="hidden" name="enabled" value="{{ 'false' if row.record.enabled else 'true' }}">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" {% if row.record.enabled %}checked{% endif %}
+                       onchange="this.form.submit()">
+              </label>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Как добавить свой плагин</h3></div>
+  <div class="card-body">
+    <p>Сторонний пакет объявляет точку входа — и плагин появляется в этом списке:</p>
+    <pre class="sm-mono">[project.entry-points."schedule_maker.plugins"]
+my_rule = "my_package.plugin"</pre>
+    <p class="mb-0 text-secondary">
+      Модуль должен экспортировать список <span class="sm-mono">PLUGINS</span> или функцию
+      <span class="sm-mono">register(registry)</span>. Подробный пример — в файле
+      <span class="sm-mono">PLUGINS.md</span> репозитория.
+    </p>
+  </div>
+</div>
+{% endblock %}
