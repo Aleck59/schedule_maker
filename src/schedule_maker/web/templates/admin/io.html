@@ -1,0 +1,156 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Импорт и экспорт · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Импорт и экспорт', 'Выгрузка расписания, загрузка справочников, внешние расписания.', 'Данные') }}
+
+<div class="row row-cards">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header"><h3 class="card-title">Выгрузка расписания</h3></div>
+      <div class="card-body">
+        <form method="get" class="mb-3" onsubmit="return false">
+          <label class="form-label" for="version">Версия</label>
+          <select class="form-select" id="version">
+            {% for v in versions %}
+              <option value="{{ v.id }}" {% if v.id == current.id %}selected{% endif %}>
+                {{ v.name }}{% if v.status == 'published' %} (опубликована){% endif %}</option>
+            {% endfor %}
+          </select>
+        </form>
+        <div class="btn-list">
+          {% for e in exporters %}
+            <a href="/admin/io/export/{{ e.key }}" class="btn"
+               onclick="this.href='/admin/io/export/{{ e.key }}?version_id=' + document.getElementById('version').value">
+              {{ ui.icon('download') }} {{ e.title }}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Загрузка справочников</h3></div>
+      <form method="post" action="/admin/io/import" enctype="multipart/form-data">
+        {{ ui.csrf(csrf_token) }}
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label" for="plugin_key">Что загружаем</label>
+            <select class="form-select" id="plugin_key" name="plugin_key">
+              {% for i in importers %}<option value="{{ i.key }}">{{ i.title }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="upload">Файл</label>
+            <input class="form-control" id="upload" name="upload" type="file" accept=".xlsx" required>
+          </div>
+          <div class="text-secondary small">
+            Ожидаемые колонки для каждого загрузчика:
+            <ul class="mt-1 mb-0">
+              {% for i in importers %}
+                <li><strong>{{ i.title }}</strong> — {{ i.manifest.description }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary" type="submit">{{ ui.icon('upload') }} Загрузить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header d-block">
+        <h3 class="card-title mb-0">Внешние расписания</h3>
+        <div class="text-secondary small">
+          Занятость преподавателя в другом учреждении — например, в Колледже.
+        </div>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for s in sources %}
+        <div class="list-group-item">
+          <div class="d-flex align-items-start">
+            <div class="flex-fill">
+              <div class="fw-bold">{{ s.name }}
+                {% if not s.enabled %}{{ ui.badge('выключен', 'secondary') }}{% endif %}</div>
+              <div class="sm-mono text-secondary small">{{ (s.config or {}).get('url', '—') }}</div>
+              {% if s.last_sync_at %}
+                <div class="text-secondary small">
+                  Синхронизация {{ s.last_sync_at.strftime('%d.%m.%Y %H:%M') }} — {{ s.last_sync_message }}
+                </div>
+              {% endif %}
+            </div>
+            <div class="btn-list ms-2">
+              <form method="post" action="/admin/io/sources/{{ s.id }}/sync" class="d-inline">
+                {{ ui.csrf(csrf_token) }}
+                <button class="btn btn-sm" type="submit">{{ ui.icon('refresh') }} Обновить</button>
+              </form>
+              <form method="post" action="/admin/io/sources/{{ s.id }}/delete" class="d-inline"
+                    onsubmit="return confirm('Удалить источник и загруженную занятость?')">
+                {{ ui.csrf(csrf_token) }}
+                <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit">{{ ui.icon('trash') }}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% else %}
+          <div class="list-group-item text-secondary">Источники не настроены.</div>
+        {% endfor %}
+      </div>
+      <form method="post" action="/admin/io/sources/save">
+        {{ ui.csrf(csrf_token) }}
+        <div class="card-body border-top">
+          <div class="mb-2">
+            <label class="form-label" for="s-name">Название источника</label>
+            <input class="form-control" id="s-name" name="name" placeholder="Колледж" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="s-plugin">Тип</label>
+            <select class="form-select" id="s-plugin" name="plugin_key">
+              {% for key, plugin in datasources.items() %}
+                <option value="{{ key }}">{{ plugin.title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="s-url">Адрес календаря</label>
+            <input class="form-control" id="s-url" name="url" placeholder="https://…/schedule.ics">
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="s-match">Сопоставлять преподавателей</label>
+            <select class="form-select" id="s-match" name="match_by">
+              <option value="email">по почте</option>
+              <option value="fio">по ФИО</option>
+            </select>
+          </div>
+          <label class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="enabled" value="true" checked>
+            <span class="form-check-label">Учитывать при генерации</span>
+          </label>
+        </div>
+        <div class="card-footer">
+          <button class="btn" type="submit">{{ ui.icon('plus') }} Добавить источник</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Прочее</h3></div>
+      <div class="list-group list-group-flush">
+        <a href="/admin/requests" class="list-group-item list-group-item-action">
+          {{ ui.icon('mail') }} Пожелания преподавателей</a>
+        <a href="/admin/audit" class="list-group-item list-group-item-action">
+          {{ ui.icon('list') }} Журнал изменений</a>
+        <a href="/admin/bells" class="list-group-item list-group-item-action">
+          {{ ui.icon('clock') }} Сетка звонков</a>
+        <a href="/admin/faculties" class="list-group-item list-group-item-action">
+          {{ ui.icon('school') }} Направления</a>
+        <a href="/admin/campuses" class="list-group-item list-group-item-action">
+          {{ ui.icon('map-pin') }} Филиалы</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

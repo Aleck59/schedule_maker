@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% import "partials/ui.html" as ui %}
+
+{% block header %}
+<header class="navbar navbar-expand-md navbar-light d-print-none">
+  <div class="container-xl">
+    <h1 class="navbar-brand mb-0">
+      <a href="/" class="text-decoration-none">{{ ui.icon('calendar-month') }} {{ app_name }}</a>
+    </h1>
+    <div class="navbar-nav flex-row order-md-last">
+      {% if user %}
+        {% if user.teacher_id %}<a href="/me" class="nav-link px-2">Мой кабинет</a>{% endif %}
+        {% if user.is_staff %}<a href="/admin" class="nav-link px-2">Админка</a>{% endif %}
+        <a href="/logout" class="nav-link px-2">Выйти</a>
+      {% else %}
+        <a href="/login" class="nav-link px-2">{{ ui.icon('login') }} Вход для преподавателей</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+{% endblock %}

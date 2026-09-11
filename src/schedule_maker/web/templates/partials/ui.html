@@ -1,0 +1,70 @@
+{# Общие макросы интерфейса. Правится в одном месте — меняется везде. #}
+
+{% macro icon(name, cls="") -%}
+<svg class="icon {{ cls }}" width="24" height="24" fill="none" stroke="currentColor"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-{{ name }}"/></svg>
+{%- endmacro %}
+
+{% macro page_header(title, subtitle="", pretitle="") %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col-12 col-md">
+        {% if pretitle %}<div class="page-pretitle">{{ pretitle }}</div>{% endif %}
+        <h2 class="page-title">{{ title }}</h2>
+        {% if subtitle %}<div class="text-secondary mt-1">{{ subtitle }}</div>{% endif %}
+      </div>
+      {# На телефоне кнопки уходят под заголовок, иначе они наезжают на название. #}
+      <div class="col-12 col-md-auto ms-md-auto mt-2 mt-md-0 d-print-none">
+        {{ caller() if caller is defined else "" }}
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro empty(title, hint="") %}
+<div class="empty">
+  <div class="empty-title">{{ title }}</div>
+  {% if hint %}<p class="empty-subtitle text-secondary">{{ hint }}</p>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro badge(text, color="secondary", hint="") -%}
+<span class="badge bg-{{ color }}-lt"{% if hint %} title="{{ hint }}"{% endif %}>{{ text }}</span>
+{%- endmacro %}
+
+{% macro csrf(token) -%}
+<input type="hidden" name="csrf_token" value="{{ token }}">
+{%- endmacro %}
+
+{# Карточка пары. Единственное место, где рисуется занятие, — и в конструкторе,
+   и в публичном расписании, и в кабинете преподавателя. #}
+{% macro lesson_card(item, compact=False, draggable=False) %}
+<div class="sm-lesson bg-{{ item.color }}-lt border-start border-3 border-{{ item.color }}
+            {% if draggable %}sm-draggable{% endif %} {% if item.locked %}sm-locked{% endif %}"
+     data-assignment="{{ item.id }}" data-demand="{{ item.demand_id }}"
+     {% if item.conflict %}data-conflict="1"{% endif %}
+     title="{{ item.subject }} · {{ item.teacher }} · {{ item.room or 'без аудитории' }}">
+  <div class="sm-lesson-title">{{ item.subject_short or item.subject }}</div>
+  {% if not compact %}
+    <div class="sm-lesson-meta">{{ item.teacher }}</div>
+    <div class="sm-lesson-meta">
+      {% if item.room %}{{ item.room }}{% else %}<span class="text-azure">дистанционно</span>{% endif %}
+      {% if item.target %} · {{ item.target }}{% endif %}
+    </div>
+  {% endif %}
+  <div class="sm-lesson-badges">
+    {% if item.type_short %}<span class="badge">{{ item.type_short }}</span>{% endif %}
+    {% if item.parity != 'any' %}
+      <span class="badge bg-yellow-lt">{{ 'нечёт' if item.parity == 'odd' else 'чёт' }}</span>
+    {% endif %}
+    {% if item.online %}<span class="badge bg-azure-lt">онлайн</span>{% endif %}
+    {% if item.stream %}<span class="badge bg-purple-lt">поток</span>{% endif %}
+    {% for extra in item.badges %}
+      <span class="badge bg-{{ extra.color }}-lt" title="{{ extra.hint }}">{{ extra.text }}</span>
+    {% endfor %}
+    {% if item.locked %}<span class="badge bg-dark-lt" title="Закреплено вручную">замок</span>{% endif %}
+  </div>
+</div>
+{% endmacro %}

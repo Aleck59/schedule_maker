@@ -1,0 +1,88 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Диагностика · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header('Предполётная диагностика', 'Проверка до запуска генератора: сойдётся ли расписание вообще.', 'Проверка') %}
+  <a href="/admin/builder" class="btn btn-primary">{{ ui.icon('player-play') }} К генерации</a>
+{% endcall %}
+
+<div class="alert sm-alert-block alert-{{ 'success' if report.ok and not report.warnings else ('danger' if not report.ok else 'warning') }}">
+  <h4 class="alert-title">{{ report.summary }}</h4>
+  {% if report.ok %}
+    <div class="text-secondary">
+      Все преподаватели и группы помещаются в сетку, аудиторий хватает.
+      Это не гарантия идеального расписания, но непреодолимых препятствий нет.
+    </div>
+  {% else %}
+    <div class="text-secondary">
+      Пока это не исправлено, часть пар останется нерасставленной — сколько бы
+      раз ни запускался генератор.
+    </div>
+  {% endif %}
+</div>
+
+{% for level, rows, color, title in [
+      ('error', report.errors, 'danger', 'Блокирующие ошибки'),
+      ('warning', report.warnings, 'warning', 'Предупреждения'),
+      ('info', report.infos, 'info', 'Замечания')] %}
+  {% if rows %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">{{ title }} <span class="badge bg-{{ color }}-lt ms-2">{{ rows|length }}</span></h3>
+    </div>
+    <div class="list-group list-group-flush">
+      {% for d in rows %}
+      <div class="list-group-item">
+        <div class="row align-items-start">
+          <div class="col-auto"><span class="text-{{ color }}">{{ ui.icon('alert-triangle') }}</span></div>
+          <div class="col">
+            <div class="fw-bold">{{ d.title }}</div>
+            <div class="text-secondary">{{ d.message }}</div>
+            {% if d.hint %}
+              <div class="mt-1 text-green sm-diagnostic-hint">{{ ui.icon('bulb') if false }}{{ d.hint }}</div>
+            {% endif %}
+          </div>
+          <div class="col-auto">
+            {% if d.subject_kind == 'teacher' and d.subject_id in teachers %}
+              <a href="/admin/teachers/{{ d.subject_id }}" class="btn btn-sm">Открыть карточку</a>
+            {% elif d.subject_kind == 'group' and d.subject_id in groups %}
+              <a href="/admin/groups/{{ d.subject_id }}" class="btn btn-sm">Открыть группу</a>
+            {% elif d.subject_kind == 'demand' %}
+              <a href="/admin/demands/{{ d.subject_id }}" class="btn btn-sm">Открыть нагрузку</a>
+            {% elif d.subject_kind == 'campus' %}
+              <a href="/admin/rooms" class="btn btn-sm">Аудитории</a>
+            {% endif %}
+          </div>
+        </div>
+        <div class="sm-mono text-secondary mt-1">{{ d.plugin_key }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+{% endfor %}
+
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Параметры сетки</h3></div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-4">
+        <div class="text-secondary small">Учебных дней в неделе</div>
+        <div class="h3">{{ problem.days }}</div>
+      </div>
+      <div class="col-md-4">
+        <div class="text-secondary small">Пар в день</div>
+        <div class="h3">{{ problem.slots }}</div>
+      </div>
+      <div class="col-md-4">
+        <div class="text-secondary small">Ёмкость сетки</div>
+        <div class="h3">{{ problem.days * problem.slots }}</div>
+      </div>
+    </div>
+    <div class="text-secondary small mt-2">
+      Размер сетки задаётся переменными окружения <span class="sm-mono">SM_DAYS_PER_WEEK</span>
+      и <span class="sm-mono">SM_SLOTS_PER_DAY</span>.
+    </div>
+  </div>
+</div>
+{% endblock %}

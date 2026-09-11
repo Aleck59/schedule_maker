@@ -2,83 +2,128 @@
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterator
+
 import pytest
-
-from schedmaker.demo import build_scenario
-from schedmaker.domain.models import Problem
-from schedmaker.domain.timetable import Timetable
-from schedmaker.engine.checker import Checker
-from schedmaker.plugins.registry import PluginRegistry
+from sqlalchemy.orm import Session
 
 
-@pytest.fixture(autouse=True, scope="session")
-def _fast_solver_budget():
-    """В тестах проверяется корректность, а не качество укладки окон.
+@pytest.fixture(scope="session", autouse=True)
+def _test_settings(tmp_path_factory) -> Iterator[None]:
+    """Своя база и предсказуемые настройки на весь прогон."""
+    path = tmp_path_factory.mktemp("db") / "test.db"
+    os.environ["SM_DATABASE_URL"] = f"sqlite:///{path}"
+    os.environ["SM_SECRET_KEY"] = "test-secret-key"
+    os.environ["SM_DEBUG"] = "1"
 
-    Жадный солвер расходует весь отпущенный бюджет на локальный поиск, поэтому
-    без этого ограничения набор тестов идёт минутами вместо секунд.
-    """
-    import os
-
-    os.environ.setdefault("SCHEDMAKER_SOLVE_TIME_LIMIT_S", "1.0")
-    from schedmaker.config import get_settings
+    from schedule_maker.config import get_settings
 
     get_settings.cache_clear()
     yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture(scope="session")
-def registry() -> PluginRegistry:
-    """Реестр со всеми встроенными плагинами."""
-    reg = PluginRegistry().discover()
-    assert not reg.errors, f"Плагины не загрузились: {reg.errors}"
-    return reg
+def engine(_test_settings):
+    from schedule_maker.db import get_engine, reset_engine
+    from schedule_maker.models import Base
+
+    reset_engine()
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    return engine
 
 
 @pytest.fixture
-def checker(registry: PluginRegistry) -> Checker:
-    return Checker(registry.constraints())
+def session(engine) -> Iterator[Session]:
+    """Чистая сессия: после теста всё откатывается."""
+    from schedule_maker.db import get_session_factory
+    from schedule_maker.models import Base
+
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    session = get_session_factory()()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
 
 
 @pytest.fixture
-def mahachkala() -> Problem:
-    return build_scenario("mahachkala")
+def demo(session: Session) -> dict[str, str]:
+    """База с демонстрационными данными филиала."""
+    from schedule_maker.seed.demo import seed_demo
+
+    credentials = seed_demo(session, admin_password="test-admin-pass")
+    session.commit()
+    return credentials
 
 
 @pytest.fixture
-def empty_timetable(mahachkala: Problem) -> Timetable:
-    return Timetable(mahachkala, [])
+def registry():
+    from schedule_maker.plugins.registry import get_registry, reset_registry
+
+    reset_registry()
+    return get_registry()
 
 
 @pytest.fixture
-def scenario_file():
-    """Загрузчик сценариев из YAML.
+def client(demo, registry):
+    """HTTP-клиент к приложению с демо-данными."""
+    from fastapi.testclient import TestClient
 
-    Новый случай из жизни добавляется файлом в `tests/fixtures`, без единой
-    строки кода — это удобно, когда учебная часть присылает очередное
-    «а у нас ещё вот так бывает».
+    from schedule_maker.main import create_app
+    from schedule_maker.web.templating import reset_templates
+
+    reset_templates()
+    with TestClient(create_app(), follow_redirects=True) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def admin_client(client):
+    """Клиент, вошедший администратором."""
+    import re
+
+    page = client.get("/admin/login")
+    token = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)
+    client.post(
+        "/admin/login",
+        data={
+            "login": "admin",
+            "password": "test-admin-pass",
+            "next": "/admin/dashboard",
+            "csrf_token": token,
+        },
+    )
+    return client
+
+
+def csrf_of(client) -> str:
+    """Токен формы из куки — его же ждёт сервер."""
+    return client.cookies.get("sm_csrf", "")
+
+
+def wait_for_generation(session, timeout: float = 90.0):
+    """Дождаться конца фоновой генерации.
+
+    Генерация идёт в отдельном потоке со своей сессией, поэтому тестовую
+    сессию приходится откатывать: иначе она продолжает видеть старый снимок.
     """
-    from pathlib import Path
+    import time
 
-    import yaml
+    from sqlalchemy import select
 
-    from schedmaker.domain.timegrid import default_period_templates
+    from schedule_maker.enums import RunStatus
+    from schedule_maker.models import GenerationRun
 
-    fixtures = Path(__file__).parent / "fixtures"
-
-    def load(name: str) -> tuple[Problem, dict]:
-        data = yaml.safe_load((fixtures / name).read_text(encoding="utf-8"))
-        expect = data.pop("expect", {})
-        data.pop("name", None)
-        problem = Problem.model_validate(data)
-        if not problem.period_templates:
-            problem = problem.model_copy(
-                update={
-                    "period_templates": [
-                        pt for loc in problem.locations for pt in default_period_templates(loc.id)
-                    ]
-                }
-            )
-        return problem, expect
-
-    return load
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        session.rollback()
+        runs = list(session.scalars(select(GenerationRun).order_by(GenerationRun.id)))
+        if runs and all(r.status in (RunStatus.DONE, RunStatus.FAILED) for r in runs):
+            return runs[-1]
+        time.sleep(0.2)
+    raise AssertionError("генерация не завершилась за отведённое время")

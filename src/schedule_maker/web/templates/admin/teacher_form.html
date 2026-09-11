@@ -1,0 +1,181 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ teacher.full_name if teacher else 'Новый преподаватель' }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header(teacher.full_name if teacher else 'Новый преподаватель', '', 'Преподаватель') %}
+  <a href="/admin/teachers" class="btn btn-link">{{ ui.icon('arrow-left') }} К списку</a>
+{% endcall %}
+
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<form method="post" action="/admin/teachers/save">
+  {{ ui.csrf(csrf_token) }}
+  {% if teacher %}<input type="hidden" name="id" value="{{ teacher.id }}">{% endif %}
+  <input type="hidden" name="availability_present" value="1">
+
+  <div class="row">
+    <div class="col-lg-5">
+      <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title">Карточка</h3></div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label" for="full_name">ФИО <span class="text-danger">*</span></label>
+            <input class="form-control" id="full_name" name="full_name" required
+                   value="{{ teacher.full_name if teacher else '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="department">Кафедра</label>
+            <input class="form-control" id="department" name="department"
+                   value="{{ teacher.department if teacher else '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="email">Почта</label>
+            <input class="form-control" id="email" name="email" type="email"
+                   value="{{ teacher.email if teacher else '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="delivery_mode">Формат преподавания</label>
+            <select class="form-select" id="delivery_mode" name="delivery_mode">
+              {% for mode in delivery_modes %}
+                <option value="{{ mode.value }}"
+                  {% if teacher and teacher.delivery_mode == mode.value %}selected{% endif %}>
+                  {{ delivery_labels[mode.value] }}
+                </option>
+              {% endfor %}
+            </select>
+            <small class="form-hint">Онлайн-пары не занимают аудиторию и не требуют переезда.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="base_campus_id">Основной филиал</label>
+            <select class="form-select" id="base_campus_id" name="base_campus_id">
+              <option value="">— не задан —</option>
+              {% for campus in campuses %}
+                <option value="{{ campus.id }}"
+                  {% if teacher and teacher.base_campus_id == campus.id %}selected{% endif %}>{{ campus.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label" for="max_pairs_per_day">Пар в день</label>
+              <input class="form-control" id="max_pairs_per_day" name="max_pairs_per_day"
+                     type="number" min="1" max="12" value="{{ teacher.max_pairs_per_day if teacher else 4 }}">
+            </div>
+            <div class="col-6 mb-3">
+              <label class="form-label" for="max_pairs_per_week">Пар в неделю</label>
+              <input class="form-control" id="max_pairs_per_week" name="max_pairs_per_week"
+                     type="number" min="1" max="60" value="{{ teacher.max_pairs_per_week if teacher else 24 }}">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="external_source_id">Внешнее расписание</label>
+            <select class="form-select" id="external_source_id" name="external_source_id">
+              <option value="">— не зависит —</option>
+              {% for source in sources %}
+                <option value="{{ source.id }}"
+                  {% if teacher and teacher.external_source_id == source.id %}selected{% endif %}>{{ source.name }}</option>
+              {% endfor %}
+            </select>
+            <small class="form-hint">Например, Колледж: его пары станут запретом здесь.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="external_ref">Идентификатор во внешнем расписании</label>
+            <input class="form-control" id="external_ref" name="external_ref"
+                   value="{{ teacher.external_ref if teacher else '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="note">Заметка</label>
+            <textarea class="form-control" id="note" name="note" rows="2">{{ teacher.note if teacher else '' }}</textarea>
+          </div>
+          <label class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="is_active"
+                   {% if not teacher or teacher.is_active %}checked{% endif %}>
+            <span class="form-check-label">Работает</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title">Доступность</h3>
+          <div class="card-actions btn-actions">
+            <button type="button" class="btn btn-sm" data-preset="all">Любой день</button>
+            <button type="button" class="btn btn-sm" data-preset="none">Снять всё</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary small">
+            Отмечены слоты, в которые преподаватель <strong>может</strong> вести.
+            Сетка показывает итог: и белый список, и чёрный сводятся сюда.
+            Если отмечено всё — ограничений нет.
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered sm-availability">
+              <thead>
+                <tr>
+                  <th></th>
+                  {% for d in days %}<th class="text-center">{{ day_short[d] }}</th>{% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in slots %}
+                <tr>
+                  <th class="text-secondary small" style="white-space:nowrap">{{ slot_labels[s] }}</th>
+                  {% for d in days %}
+                    <td class="text-center {% if (d, s) in busy %}bg-orange-lt{% endif %}"
+                        {% if (d, s) in busy %}title="Занят во внешнем расписании"{% endif %}>
+                      <input class="form-check-input m-0" type="checkbox" name="av-{{ d }}-{{ s }}"
+                             {% if allowed is none or (d, s) in allowed %}checked{% endif %}>
+                    </td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="availability_reason">Причина ограничения</label>
+            <input class="form-control" id="availability_reason" name="availability_reason"
+                   placeholder="Например: приезжает только по субботам">
+          </div>
+          {% if busy %}
+            <div class="alert alert-orange mb-0">
+              {{ ui.icon('info-circle') }} Оранжевым отмечены слоты, занятые во внешнем расписании.
+              Их нельзя занять, даже если галочка стоит.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex mb-4">
+    <a href="/admin/teachers" class="btn btn-link">Отмена</a>
+    <button type="submit" class="btn btn-primary ms-auto">{{ ui.icon('device-floppy') }} Сохранить</button>
+  </div>
+</form>
+
+{% if teacher %}
+<form method="post" action="/admin/teachers/{{ teacher.id }}/delete"
+      onsubmit="return confirm('Удалить преподавателя?')">
+  {{ ui.csrf(csrf_token) }}
+  <button class="btn btn-ghost-danger" type="submit">{{ ui.icon('trash') }} Удалить преподавателя</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Быстрые кнопки для сетки доступности.
+  document.querySelectorAll('[data-preset]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var checked = button.dataset.preset === 'all';
+      document.querySelectorAll('.sm-availability input[type=checkbox]').forEach(function (box) {
+        box.checked = checked;
+      });
+    });
+  });
+</script>
+{% endblock %}

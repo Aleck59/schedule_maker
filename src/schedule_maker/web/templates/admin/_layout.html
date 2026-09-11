@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% import "partials/ui.html" as ui %}
+
+{% macro nav_link(url, title, icon_name) %}
+  <li class="nav-item {% if request.url.path.startswith(url) %}active{% endif %}">
+    <a class="nav-link" href="{{ url }}">
+      <span class="nav-link-icon d-md-none d-lg-inline-block">{{ ui.icon(icon_name) }}</span>
+      <span class="nav-link-title">{{ title }}</span>
+    </a>
+  </li>
+{% endmacro %}
+
+{% block sidebar %}
+<aside class="navbar navbar-vertical navbar-expand-lg d-print-none">
+  <div class="container-fluid">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="navbar-brand navbar-brand-autodark">
+      <a href="/admin/dashboard" class="text-decoration-none">{{ app_name }}</a>
+    </div>
+    <div class="navbar-nav flex-row d-lg-none">
+      <div class="nav-item">
+        <a href="/logout" class="nav-link px-0" title="Выйти">{{ ui.icon('logout') }}</a>
+      </div>
+    </div>
+    <div class="collapse navbar-collapse" id="sidebar-menu">
+      <ul class="navbar-nav pt-lg-3">
+        {{ nav_link('/admin/dashboard', 'Дашборд', 'home') }}
+        {{ nav_link('/admin/builder', 'Конструктор', 'layout-grid') }}
+        {{ nav_link('/admin/diagnostics', 'Диагностика', 'alert-triangle') }}
+        {{ nav_link('/admin/demands', 'Учебный план', 'clipboard-list') }}
+        {{ nav_link('/admin/teachers', 'Преподаватели', 'users') }}
+        {{ nav_link('/admin/groups', 'Группы', 'school') }}
+        {{ nav_link('/admin/rooms', 'Аудитории', 'building-community') }}
+        {{ nav_link('/admin/subjects', 'Дисциплины', 'book') }}
+        {{ nav_link('/admin/constraints', 'Ограничения', 'shield-lock') }}
+        {{ nav_link('/admin/versions', 'Версии', 'calendar-month') }}
+        {{ nav_link('/admin/io', 'Импорт и экспорт', 'file-export') }}
+        {% if user and user.is_admin %}
+          {{ nav_link('/admin/plugins', 'Плагины', 'puzzle') }}
+          {{ nav_link('/admin/users', 'Пользователи', 'user') }}
+        {% endif %}
+        {% for item in plugin_nav %}
+          {{ nav_link(item.url, item.title, item.icon) }}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</aside>
+{% endblock %}
+
+{% block header %}
+<header class="navbar navbar-expand-md d-print-none">
+  <div class="container-xl">
+    <div class="navbar-nav flex-row order-md-last">
+      <div class="nav-item me-3">
+        <a href="/" class="nav-link px-2" title="Открытое расписание">
+          {{ ui.icon('world') }} <span class="d-none d-md-inline ms-1">Публичный вид</span>
+        </a>
+      </div>
+      <div class="nav-item dropdown">
+        <a href="#" class="nav-link d-flex lh-1 p-0 px-2" data-bs-toggle="dropdown">
+          <span class="avatar avatar-sm">{{ (user.display_name or '?')[0] }}</span>
+          <div class="d-none d-xl-block ps-2">
+            <div>{{ user.display_name }}</div>
+            <div class="mt-1 small text-secondary">{{ role_labels[user.role] }}</div>
+          </div>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end">
+          {% if user.teacher_id %}<a href="/me" class="dropdown-item">Мой кабинет</a>{% endif %}
+          <a href="/logout" class="dropdown-item">Выйти</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Пользователи · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Пользователи', 'Студентам учётная запись не нужна: расписание открыто.', 'Доступ') }}
+
+<div class="row">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead><tr><th>Логин</th><th>ФИО</th><th>Роль</th><th>Карточка</th><th class="w-1"></th></tr></thead>
+          <tbody>
+            {% for u in users %}
+            <tr {% if not u.is_active %}class="opacity-50"{% endif %}>
+              <td><strong>{{ u.login }}</strong>
+                {% if u.must_change_password %}{{ ui.badge('сменить пароль', 'yellow') }}{% endif %}</td>
+              <td>{{ u.full_name }}</td>
+              <td>{{ role_labels[u.role] }}</td>
+              <td class="text-secondary">{{ u.teacher.short_name if u.teacher else '—' }}</td>
+              <td class="text-end">
+                <form method="post" action="/admin/users/{{ u.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('Удалить пользователя?')">
+                  {{ ui.csrf(csrf_token) }}
+                  <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit">{{ ui.icon('trash') }}</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Новый пользователь</h3></div>
+      <form method="post" action="/admin/users/save">
+        {{ ui.csrf(csrf_token) }}
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label" for="u-login">Логин</label>
+            <input class="form-control" id="u-login" name="login" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="u-name">ФИО</label>
+            <input class="form-control" id="u-name" name="full_name">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="u-email">Почта</label>
+            <input class="form-control" id="u-email" name="email" type="email">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="u-role">Роль</label>
+            <select class="form-select" id="u-role" name="role">
+              {% for r in roles %}<option value="{{ r.value }}">{{ role_labels[r.value] }}</option>{% endfor %}
+            </select>
+            <small class="form-hint">
+              Администратор — всё. Диспетчер — расписание и справочники. Преподаватель — только кабинет.
+            </small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="u-teacher">Карточка преподавателя</label>
+            <select class="form-select" id="u-teacher" name="teacher_id">
+              <option value="">— не связывать —</option>
+              {% for t in teachers %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="u-password">Пароль</label>
+            <input class="form-control" id="u-password" name="password" type="text"
+                   placeholder="оставьте пустым — сгенерируем">
+          </div>
+          <label class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="is_active" value="true" checked>
+            <span class="form-check-label">Доступ разрешён</span>
+          </label>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary w-100" type="submit">{{ ui.icon('plus') }} Создать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

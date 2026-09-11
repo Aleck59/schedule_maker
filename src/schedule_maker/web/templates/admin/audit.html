@@ -1,0 +1,26 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Журнал · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Журнал изменений', 'Кто и что менял.', 'История') }}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-vcenter card-table sm-sticky-head">
+      <thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Подробности</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="text-secondary" style="white-space:nowrap">{{ row.created_at.strftime('%d.%m %H:%M') }}</td>
+          <td>{{ row.user_login }}</td>
+          <td>{{ row.action }}</td>
+          <td class="text-secondary">{{ row.entity }}{% if row.entity_id %} #{{ row.entity_id }}{% endif %}</td>
+          <td class="text-secondary">{{ row.detail }}</td>
+        </tr>
+        {% else %}
+          <tr><td colspan="5" class="text-secondary">Записей пока нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

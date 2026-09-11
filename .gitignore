@@ -3,17 +3,17 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
-build/
 dist/
+build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
-# Только каталог собранного сайта в корне репозитория.
-# Без ведущей косой черты это правило совпадает с любым каталогом site/
-# на любой глубине и утаскивает шаблоны src/schedmaker/web/templates/site/.
-/site/
 *.db
-*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite3
+data/
 .env
+.DS_Store
