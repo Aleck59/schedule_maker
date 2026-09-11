@@ -10,7 +10,10 @@ dist/
 .ruff_cache/
 .coverage
 htmlcov/
-site/
+# Только каталог собранного сайта в корне репозитория.
+# Без ведущей косой черты это правило совпадает с любым каталогом site/
+# на любой глубине и утаскивает шаблоны src/schedmaker/web/templates/site/.
+/site/
 *.db
 *.db-journal
 .env
