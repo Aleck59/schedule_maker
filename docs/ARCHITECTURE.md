@@ -105,9 +105,9 @@ class Constraint(Protocol):
 ```python
 @dataclass(frozen=True, slots=True, order=True)
 class Slot:
-    day: int              # 0 — понедельник
-    period: int           # 1 — первая пара
-    parity: WeekParity    # every | odd | even
+    day: int  # 0 — понедельник
+    period: int  # 1 — первая пара
+    parity: WeekParity  # every | odd | even
 ```
 
 «Мигающее» расписание закрывается одним полем. Пары на чётной и нечётной неделе живут
