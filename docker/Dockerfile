@@ -14,7 +14,11 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
-RUN mkdir -p /data && useradd -r -u 1000 app && chown -R app /data
+# UID 1000 удобен для прав на подключённый том, но в базовом образе он может
+# оказаться занят — тогда берём любой свободный.
+RUN mkdir -p /data \
+ && (useradd -r -u 1000 app 2>/dev/null || useradd -r app) \
+ && chown -R app /data
 USER app
 VOLUME ["/data"]
 EXPOSE 8000
