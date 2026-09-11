@@ -5,10 +5,12 @@ name: CI & Release
 
 on:
   push:
-    branches: [main]
+    # Ветка по умолчанию в этом репозитории — claude/charming-gauss-93qg20,
+    # main остаётся веткой разработки. Проверять нужно обе: иначе слияние
+    # в главную линию проходит без единого прогона.
+    branches: [main, claude/charming-gauss-93qg20]
     tags: ["v*"]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
