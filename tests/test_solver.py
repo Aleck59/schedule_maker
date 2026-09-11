@@ -152,3 +152,93 @@ def test_приоритет_отдаётся_зажатым(problem_and_engine):
     teacher_last = problem.teachers[last.teacher_id]
     assert first.fixed_slot_index is not None or teacher_first.restricted
     assert not teacher_last.restricted
+
+
+# ---------------------------------------------------------------------------
+# Объяснение, почему пара не встала
+# ---------------------------------------------------------------------------
+
+
+def test_непоставленная_пара_объясняется(problem_and_engine):
+    """Не «решение не найдено», а какое правило сколько вариантов зарубило."""
+    problem, engine = problem_and_engine
+    solution = solve(problem, engine)
+    assert solution.reports, "генератор обязан объяснить каждый отказ"
+
+    report = solution.reports[0]
+    assert report.missing > 0
+    assert report.slots_considered > 0
+    assert report.reasons, "должно быть видно, какие правила отказали"
+
+    text = report.explain(engine.rule_titles())
+    assert "не поставлено" in text
+    assert "рассмотренных вариантов" in text
+    assert "Например:" in text
+
+
+def test_объяснение_называет_главную_причину(problem_and_engine):
+    """Причины отсортированы: самая частая идёт первой."""
+    problem, engine = problem_and_engine
+    solution = solve(problem, engine)
+    report = solution.reports[0]
+    ranked = report.top_reasons()
+    assert ranked == sorted(ranked, key=lambda kv: (-kv[1], kv[0]))
+    assert ranked[0][0] in engine.rule_titles()
+
+
+def test_отчётов_нет_когда_всё_разместилось():
+    """Пустая задача не порождает шумных объяснений."""
+    from schedule_maker.domain import Problem
+    from tests.factories import add_demand, add_group, add_room, add_teacher
+
+    problem = Problem(days=6, slots=8)
+    problem.campus_names[1] = "Махачкала"
+    add_room(problem, 1)
+    add_teacher(problem, 1)
+    add_group(problem, 1)
+    add_demand(problem, 1, pairs=2)
+
+    from schedule_maker.enums import ConstraintScope
+    from schedule_maker.plugins.api import RuleBinding, RuleContext
+    from schedule_maker.plugins.builtin.constraints_core import PLUGINS
+    from schedule_maker.services.rules import BoundRule, RuleEngine
+
+    rules = []
+    for cls in PLUGINS:
+        plug = cls()
+        if not plug.always_on:
+            continue
+        rules.append(
+            BoundRule(
+                plug,
+                RuleContext(
+                    problem,
+                    [
+                        RuleBinding(
+                            ConstraintScope.GLOBAL, None, plug.params_model(), plug.default_weight
+                        )
+                    ],
+                ),
+            )
+        )
+    engine = RuleEngine(problem=problem, rules=rules)
+    solution = solve(problem, engine)
+    assert solution.unplaced == []
+    assert solution.reports == []
+
+
+def test_первое_мешающее_правило_называется(problem_and_engine):
+    """Движок умеет сказать, какое именно правило запрещает постановку."""
+    from schedule_maker.domain import Placement
+
+    problem, engine = problem_and_engine
+    teacher = next(t for t in problem.teachers.values() if t.full_name.startswith("Магомедов"))
+    demand = next(d for d in problem.demands.values() if d.teacher_id == teacher.id)
+    monday = Placement(demand_id=demand.id, component=0, day=0, index=0)
+
+    blocker = engine.first_blocker(Timetable(), monday)
+    assert blocker is not None
+    assert blocker.plugin_key == "core.teacher_availability"
+    assert blocker.is_hard
+    assert "не работает" in blocker.reason
+    assert engine.can_place(Timetable(), monday) is False

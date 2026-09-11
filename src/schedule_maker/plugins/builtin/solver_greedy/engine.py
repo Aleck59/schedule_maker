@@ -32,6 +32,7 @@ from schedule_maker.domain import (
     Score,
     Solution,
     Timetable,
+    UnplacedReport,
 )
 from schedule_maker.enums import Severity, WeekParity
 from schedule_maker.plugins.api import (
@@ -41,6 +42,14 @@ from schedule_maker.plugins.api import (
     SolverPlugin,
 )
 from schedule_maker.plugins.builtin.constraints_core._helpers import windows_in_day
+
+# Причины отказа, о которых знает сам генератор, а не правила.
+NO_ROOM = "solver.no_room"
+NO_SLOT = "solver.no_slot"
+SOLVER_REASON_TITLES = {
+    NO_ROOM: "Нет подходящей аудитории",
+    NO_SLOT: "Не осталось свободных клеток сетки",
+}
 
 LATE_SLOT_PENALTY = 4
 ROOM_CHANGE_PENALTY = 12
@@ -60,6 +69,22 @@ class Task:
     @property
     def demand_id(self) -> int:
         return self.demand.id
+
+
+@dataclass(slots=True)
+class Rejections:
+    """Сколько раз какое правило зарубило вариант и как это звучало."""
+
+    considered: int = 0
+    counts: dict[str, int] = field(default_factory=dict)
+    samples: dict[str, str] = field(default_factory=dict)
+
+    def add(self, key: str, title: str, reason: str) -> None:
+        self.counts[key] = self.counts.get(key, 0) + 1
+        self.samples.setdefault(key, reason)
+        self.titles[key] = title
+
+    titles: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -203,16 +228,30 @@ def local_cost(ctx: GreedyContext, timetable: Timetable, placement: Placement) -
     return cost
 
 
-def best_placement(ctx: GreedyContext, timetable: Timetable, task: Task) -> Placement | None:
-    """Найти лучший допустимый слот для компонента."""
+def best_placement(
+    ctx: GreedyContext,
+    timetable: Timetable,
+    task: Task,
+    tally: Rejections | None = None,
+) -> Placement | None:
+    """Найти лучший допустимый слот для компонента.
+
+    Если передана копилка ``tally``, по пути запоминается, какое правило
+    отвергло каждый вариант. Из этой статистики потом получается объяснение,
+    почему пара не встала.
+    """
     demand = task.demand
     rooms = candidate_rooms(ctx.problem, demand)
     room_ids: list[int | None] = [r.id for r in rooms] if demand.needs_room else [None]
     if demand.needs_room and not room_ids:
+        if tally is not None:
+            tally.add(NO_ROOM, SOLVER_REASON_TITLES[NO_ROOM], _no_room_message(ctx, demand))
         return None
 
     slots = list(task.base_slots)
     ctx.rng.shuffle(slots)
+    if tally is not None and not slots:
+        tally.add(NO_SLOT, SOLVER_REASON_TITLES[NO_SLOT], _no_slot_message(ctx, demand))
 
     best: Placement | None = None
     best_cost = 1 << 30
@@ -226,7 +265,12 @@ def best_placement(ctx: GreedyContext, timetable: Timetable, task: Task) -> Plac
                 parity=demand.parity,
                 room_id=room_id,
             )
-            if not ctx.engine.can_place(timetable, candidate):
+            if tally is not None:
+                tally.considered += 1
+            blocker = ctx.engine.first_blocker(timetable, candidate)
+            if blocker is not None:
+                if tally is not None:
+                    tally.add(blocker.plugin_key, blocker.title, blocker.reason)
                 continue
             cost = local_cost(ctx, timetable, candidate)
             if cost < best_cost:
@@ -234,6 +278,21 @@ def best_placement(ctx: GreedyContext, timetable: Timetable, task: Task) -> Plac
                 if cost == 0:
                     return best
     return best
+
+
+def _no_room_message(ctx: GreedyContext, demand: DemandInfo) -> str:
+    city = ctx.problem.campus_names.get(demand.campus_id, "филиале")
+    if demand.required_room_id is not None:
+        room = ctx.problem.rooms.get(demand.required_room_id)
+        code = room.code if room else demand.required_room_id
+        return f"Занятие закреплено за аудиторией {code}, но её нет в городе {city}"
+    return f"В городе {city} нет аудитории нужного типа минимум на {demand.size} мест"
+
+
+def _no_slot_message(ctx: GreedyContext, demand: DemandInfo) -> str:
+    teacher = ctx.problem.teachers.get(demand.teacher_id)
+    name = teacher.short_name if teacher else "Преподаватель"
+    return f"У {name} не осталось ни одного разрешённого времени"
 
 
 def try_relocate(ctx: GreedyContext, timetable: Timetable, task: Task) -> Placement | None:
@@ -299,21 +358,58 @@ def try_relocate(ctx: GreedyContext, timetable: Timetable, task: Task) -> Placem
 
 def run_attempt(
     ctx: GreedyContext, locked: list[Placement], tasks: list[Task]
-) -> tuple[Timetable, list[tuple[int, int]]]:
+) -> tuple[Timetable, list[tuple[int, int]], dict[int, UnplacedReport]]:
     timetable = Timetable([replace(p) for p in locked])
     unplaced: list[tuple[int, int]] = []
+    reports: dict[int, UnplacedReport] = {}
+
     for task in tasks:
         if ctx.out_of_time:
             unplaced.append((task.demand_id, task.component))
+            _note_failure(ctx, timetable, task, reports, collect=False)
             continue
         placement = best_placement(ctx, timetable, task)
         if placement is None:
             placement = try_relocate(ctx, timetable, task)
         if placement is None:
             unplaced.append((task.demand_id, task.component))
+            # Повторный проход только ради статистики: на успешном пути
+            # копилка не заводится и ничего не стоит.
+            _note_failure(ctx, timetable, task, reports, collect=True)
             continue
         timetable.add(placement)
-    return timetable, unplaced
+    return timetable, unplaced, reports
+
+
+def _note_failure(
+    ctx: GreedyContext,
+    timetable: Timetable,
+    task: Task,
+    reports: dict[int, UnplacedReport],
+    *,
+    collect: bool,
+) -> None:
+    """Запомнить, почему компонент не встал."""
+    report = reports.get(task.demand_id)
+    if report is None:
+        report = UnplacedReport(demand_id=task.demand_id, label=_demand_label(ctx, task.demand))
+        reports[task.demand_id] = report
+    report.missing += 1
+    if not collect:
+        return
+
+    tally = Rejections()
+    best_placement(ctx, timetable, task, tally)
+    report.slots_considered += tally.considered
+    for key, count in tally.counts.items():
+        report.reasons[key] = report.reasons.get(key, 0) + count
+        report.samples.setdefault(key, tally.samples[key])
+
+
+def _demand_label(ctx: GreedyContext, demand: DemandInfo) -> str:
+    teacher = ctx.problem.teachers.get(demand.teacher_id)
+    name = teacher.short_name if teacher else "—"
+    return f"{demand.subject_name} · {demand.target_label} · {name}"
 
 
 def improve(ctx: GreedyContext, timetable: Timetable, rounds: int = 2) -> None:
@@ -394,6 +490,7 @@ class GreedySolver(SolverPlugin):
 
         best_tt: Timetable | None = None
         best_unplaced: list[tuple[int, int]] = []
+        best_reports: dict[int, UnplacedReport] = {}
         best_key: tuple[int, int, int] | None = None
 
         attempts = max(1, options.max_restarts)
@@ -401,11 +498,16 @@ class GreedySolver(SolverPlugin):
             if ctx.out_of_time and best_tt is not None:
                 break
             ctx.rng = random.Random(options.seed + attempt)
-            timetable, unplaced = run_attempt(ctx, locked, tasks)
+            timetable, unplaced, reports = run_attempt(ctx, locked, tasks)
             score = engine.score(timetable)
             key = (len(unplaced), score.hard, score.soft)
             if best_key is None or key < best_key:
-                best_tt, best_unplaced, best_key = timetable, unplaced, key
+                best_tt, best_unplaced, best_reports, best_key = (
+                    timetable,
+                    unplaced,
+                    reports,
+                    key,
+                )
             ctx.log.append(f"Попытка {attempt + 1}: не размещено {len(unplaced)}, счёт {score}")
             if progress is not None:
                 progress(
@@ -430,5 +532,6 @@ class GreedySolver(SolverPlugin):
             score=Score(hard=hard, soft=soft),
             violations=violations,
             unplaced=best_unplaced,
+            reports=sorted(best_reports.values(), key=lambda r: (-r.missing, r.label)),
             log=ctx.log,
         )

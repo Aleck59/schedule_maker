@@ -224,7 +224,15 @@ class ConstraintEngine:
     def placement_errors(self, timetable: Timetable, placement: Placement) -> list[str]:
         raise NotImplementedError
 
+    def first_blocker(self, timetable: Timetable, placement: Placement) -> Any | None:
+        """Первое правило, запрещающее постановку, или ``None``."""
+        raise NotImplementedError
+
     def can_place(self, timetable: Timetable, placement: Placement) -> bool:
+        raise NotImplementedError
+
+    def rule_titles(self) -> dict[str, str]:
+        """Ключ правила -> название для текстов об отказах."""
         raise NotImplementedError
 
     def evaluate(self, timetable: Timetable) -> list[Violation]:

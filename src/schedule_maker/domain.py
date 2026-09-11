@@ -16,6 +16,7 @@ from schedule_maker.enums import (
     RoomKind,
     Severity,
     WeekParity,
+    plural,
 )
 
 # ---------------------------------------------------------------------------
@@ -301,6 +302,48 @@ class Timetable:
 
 
 @dataclass(slots=True)
+class UnplacedReport:
+    """Почему требование не встало.
+
+    Генератор, перебирая слоты, запоминает, какое правило зарубило каждый
+    вариант. Из этой статистики получается не «решение не найдено», а
+    «из 48 вариантов 30 отпало по доступным дням преподавателя, 18 — по
+    дневному лимиту», то есть видно, что именно менять.
+    """
+
+    demand_id: int
+    label: str
+    missing: int = 0
+    slots_considered: int = 0
+    #: ключ правила -> сколько раз оно отвергло вариант
+    reasons: dict[str, int] = field(default_factory=dict)
+    #: ключ правила -> пример человеческой формулировки отказа
+    samples: dict[str, str] = field(default_factory=dict)
+
+    def top_reasons(self, limit: int = 3) -> list[tuple[str, int]]:
+        """Самые частые причины: дальше начинается шум."""
+        return sorted(self.reasons.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+
+    def explain(self, titles: dict[str, str] | None = None) -> str:
+        """Одна человеческая фраза про одно непоставленное требование."""
+        titles = titles or {}
+        head = f"«{self.label}»: не поставлено {plural(self.missing, 'пара', 'пары', 'пар')}."
+        ranked = self.top_reasons()
+        if not ranked:
+            return f"{head} Свободных слотов не осталось."
+
+        parts = [f"{count} — «{titles.get(key, key)}»" for key, count in ranked]
+        lead = (
+            f"Из {self.slots_considered} рассмотренных вариантов "
+            if self.slots_considered
+            else "Отпало: "
+        )
+        sample = self.samples.get(ranked[0][0])
+        tail = f" Например: {sample}" if sample else ""
+        return f"{head} {lead}{', '.join(parts)}.{tail}"
+
+
+@dataclass(slots=True)
 class Solution:
     """Результат работы движка."""
 
@@ -308,4 +351,5 @@ class Solution:
     score: Score = field(default_factory=Score)
     violations: list[Violation] = field(default_factory=list)
     unplaced: list[tuple[int, int]] = field(default_factory=list)  # (demand_id, component)
+    reports: list[UnplacedReport] = field(default_factory=list)
     log: list[str] = field(default_factory=list)

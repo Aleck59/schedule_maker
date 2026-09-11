@@ -25,13 +25,17 @@
         </div>
         {% set unplaced = (run.report or {}).get('unplaced', []) %}
         {% if unplaced %}
-          <details class="mt-2">
+          <details class="mt-2" open>
             <summary>Не удалось разместить: {{ unplaced|length }}</summary>
             <ul class="mt-2 mb-0">
-              {% for item in unplaced %}<li>{{ item.label }}</li>{% endfor %}
+              {% for item in unplaced %}
+                <li class="mb-1">{{ item.explanation or item.label }}</li>
+              {% endfor %}
             </ul>
             <div class="mt-2">
-              Причины — на странице <a href="/admin/diagnostics">диагностики</a>.
+              Если причина повторяется у многих — смотрите
+              <a href="/admin/diagnostics">диагностику</a>: возможно, дело в данных,
+              а не в расстановке.
             </div>
           </details>
         {% endif %}

@@ -175,7 +175,7 @@ def generate_command(
         if unplaced:
             typer.echo("\nНе удалось разместить:")
             for item in unplaced:
-                typer.echo(f"  · {item['label']}")
+                typer.echo(f"  · {item.get('explanation') or item['label']}")
 
 
 @app.command("plugins")

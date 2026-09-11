@@ -15,6 +15,7 @@ from schedule_maker.enums import RunStatus, Severity
 from schedule_maker.models import GenerationRun, ScheduleVersion
 from schedule_maker.models.base import utcnow
 from schedule_maker.plugins.api import SolverOptions
+from schedule_maker.plugins.builtin.solver_greedy.engine import SOLVER_REASON_TITLES
 from schedule_maker.plugins.hooks import fire
 from schedule_maker.plugins.registry import get_registry
 from schedule_maker.services.feasibility import FeasibilityReport, check_feasibility
@@ -67,7 +68,7 @@ def run_generation(run_id: int) -> None:
         session.flush()
 
         try:
-            solution, report = _execute(session, version, run)
+            solution, report, engine_titles = _execute(session, version, run)
         except Exception as exc:  # pragma: no cover - защитный код
             log.exception("Генерация #%s провалилась", run_id)
             run.status = RunStatus.FAILED
@@ -75,6 +76,7 @@ def run_generation(run_id: int) -> None:
             run.finished_at = utcnow()
             return
 
+        titles = {**SOLVER_REASON_TITLES, **engine_titles}
         stats = save_timetable(session, version, solution.timetable)
         version.hard_score = solution.score.hard
         version.soft_score = solution.score.soft
@@ -104,13 +106,16 @@ def run_generation(run_id: int) -> None:
                 }
                 for v in solution.violations[:200]
             ],
+            # Не просто «не поставилось», а по чьей вине: статистика отказов
+            # по правилам с примером формулировки.
             "unplaced": [
                 {
-                    "demand_id": demand_id,
-                    "component": component,
-                    "label": _demand_label(session, demand_id),
+                    "demand_id": report.demand_id,
+                    "label": report.label,
+                    "missing": report.missing,
+                    "explanation": report.explain(titles),
                 }
-                for demand_id, component in solution.unplaced
+                for report in solution.reports
             ],
         }
         fire("after_generate", version_id=version.id, run_id=run.id, solution=solution)
@@ -118,7 +123,7 @@ def run_generation(run_id: int) -> None:
 
 def _execute(
     session: Session, version: ScheduleVersion, run: GenerationRun
-) -> tuple[Solution, FeasibilityReport]:
+) -> tuple[Solution, FeasibilityReport, dict[str, str]]:
     settings = get_settings()
     options_data = run.report or {}
     problem = build_problem(session)
@@ -149,7 +154,7 @@ def _execute(
         session.flush()
 
     solution = solver.solve(problem, engine, options, progress)
-    return solution, report
+    return solution, report, engine.rule_titles()
 
 
 def _summary(solution: Solution) -> str:
@@ -160,16 +165,6 @@ def _summary(solution: Solution) -> str:
     parts.append("жёстких нарушений нет" if hard == 0 else f"жёстких нарушений: {hard}")
     return ", ".join(parts) + "."
 
-
-def _demand_label(session: Session, demand_id: int) -> str:
-    from schedule_maker.models import LessonDemand
-
-    demand = session.get(LessonDemand, demand_id)
-    if demand is None:
-        return f"нагрузка #{demand_id}"
-    subject = demand.subject.name if demand.subject else "—"
-    teacher = demand.teacher.short_name if demand.teacher else "—"
-    return f"{subject} · {demand.target_label} · {teacher}"
 
 
 def run_in_background(run_id: int) -> threading.Thread:

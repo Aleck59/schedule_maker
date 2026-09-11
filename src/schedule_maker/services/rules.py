@@ -134,15 +134,36 @@ class RuleEngine(ConstraintEngine):
     def placement_errors(self, timetable: Timetable, placement: Placement) -> list[str]:
         return [i.reason for i in self.placement_issues(timetable, placement) if i.is_hard]
 
-    def can_place(self, timetable: Timetable, placement: Placement) -> bool:
-        """Быстрый вариант: прерывается на первом жёстком запрете."""
+    def first_blocker(self, timetable: Timetable, placement: Placement) -> PlacementIssue | None:
+        """Первое правило, которое запрещает эту постановку.
+
+        Прерывается на первом же запрете: генератору не нужен полный список,
+        ему нужно знать, что сюда нельзя и почему — причина потом попадает
+        в статистику отказов.
+        """
         demand = self.problem.demands.get(placement.demand_id)
         scope_ids = _scope_ids(self.problem, demand)
         for rule in self.rules:
             reason = rule.plugin.check_placement(rule.context, timetable, placement)
-            if reason is not None and _effective_weight(rule, scope_ids) >= HARD_WEIGHT:
-                return False
-        return True
+            if reason is None:
+                continue
+            weight = _effective_weight(rule, scope_ids)
+            if weight >= HARD_WEIGHT:
+                return PlacementIssue(
+                    plugin_key=rule.plugin.key,
+                    title=rule.plugin.title,
+                    reason=reason,
+                    weight=weight,
+                )
+        return None
+
+    def can_place(self, timetable: Timetable, placement: Placement) -> bool:
+        """Быстрый вариант: прерывается на первом жёстком запрете."""
+        return self.first_blocker(timetable, placement) is None
+
+    def rule_titles(self) -> dict[str, str]:
+        """Ключ правила -> название, понятное человеку."""
+        return {rule.plugin.key: rule.plugin.title for rule in self.rules}
 
     # -- проверка всей сетки ----------------------------------------------
 

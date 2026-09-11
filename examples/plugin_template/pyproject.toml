@@ -1,0 +1,26 @@
+# Пример стороннего расширения для Schedule Maker.
+#
+#   pip install -e examples/plugin_template
+#   sm plugins          # правило уже в списке
+#
+# Ядро программы при этом не меняется ни одной строкой: реестр находит
+# плагин по точке входа и подключает его сам.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "my-schedule-rules"
+version = "0.1.0"
+description = "Пример собственного правила для Schedule Maker"
+requires-python = ">=3.11"
+dependencies = ["schedule-maker"]
+
+# Вот и вся регистрация. Модуль должен экспортировать список PLUGINS
+# или функцию register(registry).
+[project.entry-points."schedule_maker.plugins"]
+my_schedule_rules = "my_schedule_rules.rules"
+
+[tool.hatch.build.targets.wheel]
+packages = ["my_schedule_rules"]
