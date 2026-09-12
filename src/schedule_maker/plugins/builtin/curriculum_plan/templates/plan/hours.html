@@ -8,10 +8,6 @@
   <a href="/admin/plan/{{ plan.id }}" class="btn">{{ ui.icon('arrow-left') }} К плану</a>
 {% endcall %}
 
-{% if request.query_params.get('ok') %}
-  <div class="alert alert-success">{{ request.query_params['ok'] }}</div>
-{% endif %}
-
 <div class="row row-cards mb-3">
   <div class="col-6 col-lg-3">
     {{ ui.stat_tile('Дано по плану', grand.planned, '#', 'clipboard-list', 'primary', 'часов') }}

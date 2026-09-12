@@ -1,0 +1,21 @@
+{% import "partials/ui.html" as ui %}
+<div class="alert sm-alert-block alert-warning mb-3">
+  <h4 class="alert-title">{{ ui.icon('alert-circle') }} Изменения в расписании</h4>
+  <p class="mb-2">Ближайшие дни идут не так, как в сетке ниже.</p>
+  {% for day in data.days %}
+    <div class="mb-2">
+      <strong>{{ day.on_date.strftime('%d.%m') }}, {{ day_names[day.on_date.weekday()]|lower }}</strong>
+      <ul class="mb-0">
+        {% for change in day.items %}
+          <li>
+            {% if change.assignment %}
+              {{ change.assignment.slot_index + 1 }}-я пара,
+              {{ change.assignment.demand.subject.name }} —
+            {% endif %}
+            {{ data.describe(change) }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endfor %}
+</div>

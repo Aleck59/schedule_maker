@@ -37,6 +37,27 @@ class ControlForm(StrEnum):
     COURSEWORK = "coursework"  # курсовая работа или проект
 
 
+class DisruptionKind(StrEnum):
+    """Почему расписание пришлось менять."""
+
+    HOLIDAY = "holiday"  # праздник или выходной день
+    SICK = "sick"  # преподаватель заболел
+    TRIP = "trip"  # командировка, конференция
+    REPAIR = "repair"  # аудитория недоступна
+    QUARANTINE = "quarantine"  # карантин, отмена занятий у группы
+    OTHER = "other"  # всё прочее
+
+
+class ChangeKind(StrEnum):
+    """Что сделали с занятием."""
+
+    CANCEL = "cancel"  # отменено
+    MOVE = "move"  # перенесено на другое время
+    SUBSTITUTE = "substitute"  # ведёт другой преподаватель
+    ROOM = "room"  # другая аудитория
+    ONLINE = "online"  # переведено в дистанционный формат
+
+
 class DeliveryMode(StrEnum):
     """Формат проведения."""
 
@@ -175,6 +196,44 @@ CONTROL_FORM_SHORT: dict[str, str] = {
     ControlForm.GRADED_CREDIT: "зач. с оц.",
     ControlForm.EXAM: "экз.",
     ControlForm.COURSEWORK: "курс.",
+}
+
+DISRUPTION_LABELS: dict[str, str] = {
+    DisruptionKind.HOLIDAY: "Праздник",
+    DisruptionKind.SICK: "Болезнь преподавателя",
+    DisruptionKind.TRIP: "Командировка",
+    DisruptionKind.REPAIR: "Аудитория недоступна",
+    DisruptionKind.QUARANTINE: "Занятий у группы нет",
+    DisruptionKind.OTHER: "Другая причина",
+}
+DISRUPTION_HINTS: dict[str, str] = {
+    DisruptionKind.HOLIDAY: "Занятий нет ни у кого в эти дни",
+    DisruptionKind.SICK: "Занятия выбранного преподавателя",
+    DisruptionKind.TRIP: "Занятия выбранного преподавателя",
+    DisruptionKind.REPAIR: "Занятия в выбранной аудитории",
+    DisruptionKind.QUARANTINE: "Занятия выбранной группы",
+    DisruptionKind.OTHER: "Выберите, кого это касается",
+}
+CHANGE_LABELS: dict[str, str] = {
+    ChangeKind.CANCEL: "Отменить",
+    ChangeKind.MOVE: "Перенести",
+    ChangeKind.SUBSTITUTE: "Заменить преподавателя",
+    ChangeKind.ROOM: "Сменить аудиторию",
+    ChangeKind.ONLINE: "Перевести в дистант",
+}
+CHANGE_PAST: dict[str, str] = {
+    ChangeKind.CANCEL: "отменено",
+    ChangeKind.MOVE: "перенесено",
+    ChangeKind.SUBSTITUTE: "заменён преподаватель",
+    ChangeKind.ROOM: "другая аудитория",
+    ChangeKind.ONLINE: "дистанционно",
+}
+CHANGE_COLORS: dict[str, str] = {
+    ChangeKind.CANCEL: "red",
+    ChangeKind.MOVE: "orange",
+    ChangeKind.SUBSTITUTE: "purple",
+    ChangeKind.ROOM: "blue",
+    ChangeKind.ONLINE: "teal",
 }
 
 ROOM_KIND_LABELS: dict[str, str] = {

@@ -9,6 +9,12 @@
   </div>
 {% endcall %}
 
+{# Место для дополнений от плагинов: изменения на ближайшие дни и
+   всё прочее, что важно увидеть раньше самой сетки. #}
+{% for panel in panels | default([]) %}
+  {% with data = panel.data %}{% include panel.template %}{% endwith %}
+{% endfor %}
+
 <div class="card mb-3 d-print-none">
   <div class="card-body py-2">
     <div class="btn-group w-100" role="group">

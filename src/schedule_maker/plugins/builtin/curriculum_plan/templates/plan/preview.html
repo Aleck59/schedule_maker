@@ -7,10 +7,6 @@
     'Проверьте прочитанное и снимите галочки с лишних строк. В базу попадёт только отмеченное.',
     source_name) }}
 
-{% if request.query_params.get('err') %}
-  <div class="alert alert-danger">{{ request.query_params['err'] }}</div>
-{% endif %}
-
 <div class="alert sm-alert-block alert-{{ 'warning' if flagged else 'info' }}">
   <h4 class="alert-title">
     Прочитано {{ plural(rows|length, 'строка', 'строки', 'строк') }}

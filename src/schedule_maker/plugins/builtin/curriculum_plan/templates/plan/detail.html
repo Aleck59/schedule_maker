@@ -15,13 +15,6 @@
   </div>
 {% endcall %}
 
-{% if request.query_params.get('ok') %}
-  <div class="alert alert-success">{{ request.query_params['ok'] }}</div>
-{% endif %}
-{% if request.query_params.get('err') %}
-  <div class="alert alert-danger">{{ request.query_params['err'] }}</div>
-{% endif %}
-
 {% if flagged %}
   <div class="alert sm-alert-block alert-warning">
     <h4 class="alert-title">{{ plural(flagged, 'строку', 'строки', 'строк') }} стоит проверить</h4>

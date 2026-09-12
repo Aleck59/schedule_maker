@@ -1,10 +1,10 @@
 {% extends "admin/_layout.html" %}
 {% import "partials/ui.html" as ui %}
-{% block title %}Учебный план · {{ app_name }}{% endblock %}
+{% block title %}Нагрузка · {{ app_name }}{% endblock %}
 {% block content %}
 {% call ui.page_header(
-      'Учебный план',
-      'Что, кому и сколько занятий нужно поставить за неделю. Из этих записей программа и собирает расписание.') %}
+      'Нагрузка',
+      'Что, кому и сколько занятий нужно поставить за неделю. Из этих записей программа и собирает расписание; часы за семестр живут в учебном плане.') %}
   <a href="/admin/demands/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить занятия</a>
 {% endcall %}
 
