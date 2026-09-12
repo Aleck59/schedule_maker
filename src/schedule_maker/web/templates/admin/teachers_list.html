@@ -2,8 +2,10 @@
 {% import "partials/ui.html" as ui %}
 {% block title %}Преподаватели · {{ app_name }}{% endblock %}
 {% block content %}
-{% call ui.page_header('Преподаватели', 'Самая сложная сущность: у каждого свои дни, лимиты и формат.', 'Справочник') %}
-  <a href="/admin/teachers/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить</a>
+{% call ui.page_header(
+      'Преподаватели',
+      'У каждого свои доступные дни, предельная нагрузка и формат занятий. Именно эти ограничения чаще всего и мешают расписанию сойтись.') %}
+  <a href="/admin/teachers/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить преподавателя</a>
 {% endcall %}
 
 <div class="card">
@@ -13,9 +15,9 @@
         <tr>
           <th>ФИО</th>
           <th>Кафедра</th>
-          <th>Формат</th>
-          <th class="text-center">Нагрузка</th>
-          <th>Доступные дни</th>
+          <th>Формат занятий</th>
+          <th>Нагрузка</th>
+          <th>Когда может вести</th>
           <th class="w-1"></th>
         </tr>
       </thead>
@@ -26,7 +28,7 @@
             <a href="/admin/teachers/{{ row.teacher.id }}" class="text-reset">{{ row.teacher.full_name }}</a>
             {% if not row.teacher.is_active %}{{ ui.badge('не работает', 'secondary') }}{% endif %}
             {% if row.teacher.external_source_id %}
-              {{ ui.badge('внешнее расписание', 'orange', 'Занятость подтягивается из другого учреждения') }}
+              {{ ui.badge('занят и в другом месте', 'orange', 'Занятость подтягивается из внешнего расписания') }}
             {% endif %}
           </td>
           <td class="text-secondary">{{ row.teacher.department }}</td>
@@ -34,17 +36,17 @@
             {% if row.teacher.delivery_mode == 'online' %}{{ ui.badge('онлайн', 'azure') }}
             {% else %}<span class="text-secondary">{{ delivery_labels[row.teacher.delivery_mode] }}</span>{% endif %}
           </td>
-          <td class="text-center">
+          <td>
             <span class="{% if row.load > row.free_slots %}text-danger fw-bold{% endif %}">{{ row.load }}</span>
-            <span class="text-secondary">/ {{ row.free_slots }}</span>
+            <span class="text-secondary">из {{ row.free_slots }} возможных</span>
           </td>
           <td>
             {% if row.restricted %}
               {% for d in row.days %}{{ ui.badge(day_short[d], 'blue') }} {% endfor %}
               {% if not row.days %}{{ ui.badge('нет доступных дней', 'red') }}{% endif %}
-            {% else %}<span class="text-secondary">любой день</span>{% endif %}
+            {% else %}<span class="text-secondary">в любой день</span>{% endif %}
           </td>
-          <td class="text-end">
+          <td class="sm-actions">
             <a href="/admin/teachers/{{ row.teacher.id }}" class="btn btn-sm btn-icon">{{ ui.icon('pencil') }}</a>
             <a href="/t/{{ row.teacher.slug }}" class="btn btn-sm btn-icon" title="Расписание">{{ ui.icon('calendar-month') }}</a>
           </td>
@@ -54,8 +56,9 @@
     </table>
   </div>
 </div>
-<div class="text-secondary mt-2 small">
-  В колонке «Нагрузка» — назначенные пары и число доступных слотов. Красное значение
-  означает, что расписание не сойдётся; подробности на странице «Диагностика».
-</div>
+<p class="mt-3">
+  В колонке «Нагрузка» слева — сколько занятий назначено, справа — сколько
+  помещается в доступные дни. Красное число означает, что расписание не сойдётся;
+  что именно делать — на странице <a href="/admin/diagnostics">проверки данных</a>.
+</p>
 {% endblock %}

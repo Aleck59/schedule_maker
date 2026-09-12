@@ -1,30 +1,32 @@
 {% extends "admin/_layout.html" %}
 {% import "partials/ui.html" as ui %}
-{% block title %}Диагностика · {{ app_name }}{% endblock %}
+{% block title %}Проверка данных · {{ app_name }}{% endblock %}
 {% block content %}
-{% call ui.page_header('Предполётная диагностика', 'Проверка до запуска генератора: сойдётся ли расписание вообще.', 'Проверка') %}
-  <a href="/admin/builder" class="btn btn-primary">{{ ui.icon('player-play') }} К генерации</a>
+{% call ui.page_header(
+      'Проверка данных',
+      'Считаем заранее, сойдётся ли расписание: хватает ли преподавателям дней, группам — места в неделе, а филиалам — аудиторий.') %}
+  <a href="/admin/builder" class="btn btn-primary">{{ ui.icon('layout-grid') }} К расстановке</a>
 {% endcall %}
 
 <div class="alert sm-alert-block alert-{{ 'success' if report.ok and not report.warnings else ('danger' if not report.ok else 'warning') }}">
   <h4 class="alert-title">{{ report.summary }}</h4>
   {% if report.ok %}
-    <div class="text-secondary">
-      Все преподаватели и группы помещаются в сетку, аудиторий хватает.
-      Это не гарантия идеального расписания, но непреодолимых препятствий нет.
-    </div>
+    <p class="mb-0">
+      Все преподаватели и группы помещаются в неделю, аудиторий хватает.
+      Это не гарантия идеального расписания, но непреодолимых помех нет.
+    </p>
   {% else %}
-    <div class="text-secondary">
-      Пока это не исправлено, часть пар останется нерасставленной — сколько бы
-      раз ни запускался генератор.
-    </div>
+    <p class="mb-0">
+      Пока это не исправлено, часть занятий останется без места — сколько бы
+      раз вы ни запускали составление.
+    </p>
   {% endif %}
 </div>
 
 {% for level, rows, color, title in [
-      ('error', report.errors, 'danger', 'Блокирующие ошибки'),
-      ('warning', report.warnings, 'warning', 'Предупреждения'),
-      ('info', report.infos, 'info', 'Замечания')] %}
+      ('error', report.errors, 'danger', 'Расписание не сложится'),
+      ('warning', report.warnings, 'warning', 'Стоит обратить внимание'),
+      ('info', report.infos, 'info', 'К сведению')] %}
   {% if rows %}
   <div class="card mb-3">
     <div class="card-header">
@@ -38,9 +40,7 @@
           <div class="col">
             <div class="fw-bold">{{ d.title }}</div>
             <div class="text-secondary">{{ d.message }}</div>
-            {% if d.hint %}
-              <div class="mt-1 text-green sm-diagnostic-hint">{{ ui.icon('bulb') if false }}{{ d.hint }}</div>
-            {% endif %}
+            {% if d.hint %}<div class="mt-1 text-success">{{ d.hint }}</div>{% endif %}
           </div>
           <div class="col-auto">
             {% if d.subject_kind == 'teacher' and d.subject_id in teachers %}
@@ -54,7 +54,6 @@
             {% endif %}
           </div>
         </div>
-        <div class="sm-mono text-secondary mt-1">{{ d.plugin_key }}</div>
       </div>
       {% endfor %}
     </div>
@@ -63,7 +62,7 @@
 {% endfor %}
 
 <div class="card">
-  <div class="card-header"><h3 class="card-title">Параметры сетки</h3></div>
+  <div class="card-header"><h3 class="card-title">Размер учебной недели</h3></div>
   <div class="card-body">
     <div class="row">
       <div class="col-md-4">
@@ -75,14 +74,14 @@
         <div class="h3">{{ problem.slots }}</div>
       </div>
       <div class="col-md-4">
-        <div class="text-secondary small">Ёмкость сетки</div>
+        <div class="text-secondary small">Всего мест в неделе</div>
         <div class="h3">{{ problem.days * problem.slots }}</div>
       </div>
     </div>
-    <div class="text-secondary small mt-2">
-      Размер сетки задаётся переменными окружения <span class="sm-mono">SM_DAYS_PER_WEEK</span>
-      и <span class="sm-mono">SM_SLOTS_PER_DAY</span>.
-    </div>
+    <p class="mt-2 mb-0">
+      Размер недели задаётся при установке программы, переменными
+      <span class="sm-mono">SM_DAYS_PER_WEEK</span> и <span class="sm-mono">SM_SLOTS_PER_DAY</span>.
+    </p>
   </div>
 </div>
 {% endblock %}

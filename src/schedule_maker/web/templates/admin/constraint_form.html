@@ -4,16 +4,16 @@
 {% block content %}
 {{ ui.page_header(plugin.title if plugin else 'Новое правило', plugin.description if plugin else '', 'Ограничения') }}
 
-<div class="row justify-content-center">
-  <div class="col-lg-8">
+<div class="row">
+  <div class="col-lg-8 col-xxl-7">
     {% if not plugin %}
       <div class="card">
-        <div class="card-header"><h3 class="card-title">Выберите тип правила</h3></div>
+        <div class="card-header"><h3 class="card-title">Какое правило добавить</h3></div>
         <div class="list-group list-group-flush">
           {% for p in plugins %}
             <a href="/admin/constraints/new?plugin_key={{ p.key }}" class="list-group-item list-group-item-action">
               <div class="fw-bold">{{ p.title }}</div>
-              <div class="text-secondary small">{{ p.description }}</div>
+              <div class="small">{{ p.description }}</div>
             </a>
           {% endfor %}
         </div>
@@ -27,14 +27,14 @@
           <div class="card-body">
             {% if scope_options %}
             <div class="mb-3">
-              <label class="form-label" for="scope_id">{{ scope_label }}</label>
+              <label class="form-label" for="scope_id">К кому применить</label>
               <select class="form-select" id="scope_id" name="scope_id">
-                <option value="">— для всех —</option>
+                <option value="">Ко всем</option>
                 {% for value, label in scope_options %}
                   <option value="{{ value }}" {% if rule and rule.scope_id == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
-              <small class="form-hint">Правило для конкретного объекта важнее общего.</small>
+              {% if scope_hint %}{{ ui.hint(scope_hint) }}{% endif %}
             </div>
             {% endif %}
 
@@ -54,27 +54,37 @@
                          {% if f.min is not none %}min="{{ f.min }}"{% endif %}
                          {% if f.max is not none %}max="{{ f.max }}"{% endif %}>
                 {% endif %}
-                {% if f.help %}<small class="form-hint">{{ f.help }}</small>{% endif %}
+                {{ ui.hint(f.help) }}
               </div>
             {% endfor %}
 
-            <div class="mb-3">
-              <label class="form-label" for="weight">
-                Вес: <span id="weight-value">{{ rule.weight if rule else plugin.default_weight }}</span>
-              </label>
-              <input type="range" class="form-range" id="weight" name="weight" min="0" max="100" step="5"
-                     value="{{ rule.weight if rule else plugin.default_weight }}"
-                     oninput="document.getElementById('weight-value').textContent = this.value">
-              <small class="form-hint">
-                100 — жёсткое правило, нарушить нельзя. Меньше — мягкое: генератор
-                постарается его соблюсти, но при необходимости отступит.
-              </small>
+            {# Пояснение к строгости не помещается в <option> — оно обрезается
+               на середине слова. Поэтому в списке только название, а
+               расшифровка выбранного уровня показывается под ним. #}
+            {% set current = rule.weight if rule else plugin.default_weight %}
+            {# Начальное значение берём у самого select: вес правила (скажем, 90)
+               не обязан совпадать с уровнем из списка (80), а подсказка должна
+               соответствовать выбранному пункту, а не сохранённому числу. #}
+            <div class="mb-3" x-data="{ weight: null }" x-init="weight = $refs.level.value">
+              <label class="form-label" for="weight">Насколько строго соблюдать</label>
+              <select class="form-select" id="weight" name="weight"
+                      x-ref="level" @change="weight = $event.target.value">
+                {% for level, label, hint in strictness_levels %}
+                  <option value="{{ level }}" {% if strictness_label(current) == label %}selected{% endif %}>
+                    {{ label }}
+                  </option>
+                {% endfor %}
+              </select>
+              {% for level, label, hint in strictness_levels %}
+                <div class="form-hint" x-show="weight == '{{ level }}'" x-cloak>{{ hint }}.</div>
+              {% endfor %}
+              {{ ui.hint('Если два пожелания противоречат друг другу, побеждает более строгое.') }}
             </div>
 
             <div class="mb-3">
               <label class="form-label" for="note">Комментарий</label>
               <input class="form-control" id="note" name="note" value="{{ rule.note if rule else '' }}"
-                     placeholder="Зачем это правило">
+                     placeholder="Зачем это правило — чтобы через полгода было понятно">
             </div>
 
             <label class="form-check form-switch">

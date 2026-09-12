@@ -344,6 +344,21 @@ class Badge:
     hint: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class Panel:
+    """Блок, который плагин добавляет на чужую страницу.
+
+    ``template`` — имя шаблона из каталога плагина; он подключается там,
+    где страница отвела место для дополнений. Так плагин дописывает
+    открытое расписание, не переопределяя его целиком.
+    """
+
+    template: str
+    data: dict[str, Any] = field(default_factory=dict)
+    #: Меньше — выше. Важное (отмена занятия) должно быть видно сразу.
+    order: int = 100
+
+
 class UIPlugin:
     """Плагин, добавляющий свои страницы и элементы интерфейса."""
 
@@ -361,6 +376,14 @@ class UIPlugin:
         return []
 
     def cell_badges(self, demand: Any) -> list[Badge]:
+        return []
+
+    def public_panels(self, session: Any, *, kind: str, subject_id: int) -> list[Panel]:
+        """Что дописать на открытой странице расписания.
+
+        ``kind`` — чьё расписание показывают: ``group``, ``teacher`` или
+        ``room``; ``subject_id`` — его номер.
+        """
         return []
 
 

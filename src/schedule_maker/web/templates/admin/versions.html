@@ -2,34 +2,42 @@
 {% import "partials/ui.html" as ui %}
 {% block title %}Версии · {{ app_name }}{% endblock %}
 {% block content %}
-{{ ui.page_header('Версии расписания', 'Снимки, публикация и откат. Студенты видят только опубликованную версию.', 'Версии') }}
+{{ ui.page_header(
+    'Версии расписания',
+    'Студенты и преподаватели видят только опубликованную версию. Черновик можно править сколько угодно — наружу он не попадёт, пока вы не опубликуете его заново.') }}
 
 <div class="card">
   <div class="table-responsive">
     <table class="table table-vcenter card-table">
       <thead>
-        <tr><th>Название</th><th>Семестр</th><th class="text-center">Пар</th><th class="text-center">Счёт</th>
-            <th>Состояние</th><th class="w-1"></th></tr>
+        <tr><th>Название</th><th>Семестр</th><th>Занятий</th><th>Состояние</th><th class="w-1"></th></tr>
       </thead>
       <tbody>
         {% for v in versions %}
         <tr>
           <td>
             <strong>{{ v.name }}</strong>
-            {% if v.id == draft.id %}{{ ui.badge('рабочий черновик', 'blue') }}{% endif %}
-            {% if v.note %}<div class="text-secondary small">{{ v.note }}</div>{% endif %}
+            {% if v.id == draft.id %}<span class="badge bg-blue-lt">над ней работаете</span>{% endif %}
+            {% if v.note %}<div class="small text-secondary">{{ v.note }}</div>{% endif %}
           </td>
-          <td class="text-secondary">{{ v.semester or '—' }}</td>
-          <td class="text-center">{{ counts.get(v.id, 0) }}</td>
-          <td class="text-center">
-            <span class="{% if v.hard_score %}text-danger{% else %}text-green{% endif %}">{{ v.hard_score }}</span>
-            <span class="text-secondary">/ {{ v.soft_score }}</span>
-          </td>
+          <td>{{ v.semester or '—' }}</td>
+          <td>{{ counts.get(v.id, 0) }}</td>
           <td>
-            {% if v.status == 'published' %}{{ ui.badge('опубликовано', 'green') }}
-            {% elif v.status == 'archived' %}{{ ui.badge('архив', 'secondary') }}
-            {% else %}{{ ui.badge('черновик', 'blue') }}{% endif %}
-            {% if v.published_at %}<div class="text-secondary small">{{ v.published_at.strftime('%d.%m.%Y %H:%M') }}</div>{% endif %}
+            {% if v.status == 'published' %}
+              <span class="badge bg-success text-white">Опубликовано</span>
+            {% elif v.status == 'archived' %}
+              <span class="badge bg-secondary-lt">Снято с публикации</span>
+            {% else %}
+              <span class="badge bg-blue-lt">Черновик</span>
+            {% endif %}
+            <div class="small mt-1">
+              <span class="{{ 'text-danger' if v.hard_score else 'text-success' }}">
+                {{ conflicts_phrase(v.hard_score) }}
+              </span>
+              {% if v.published_at %}
+                <span class="text-secondary">· с {{ v.published_at.strftime('%d.%m.%Y') }}</span>
+              {% endif %}
+            </div>
           </td>
           <td class="text-end">
             <div class="btn-list justify-content-end">
@@ -68,7 +76,7 @@
 
 <div class="alert alert-info mt-3">
   {{ ui.icon('info-circle') }}
-  Прежде чем крупно менять расписание, сделайте снимок: к нему можно вернуться,
-  если новая расстановка окажется хуже.
+  Прежде чем крупно менять расписание, сохраните копию кнопкой с дискетой:
+  к ней можно вернуться, если новый вариант окажется хуже.
 </div>
 {% endblock %}

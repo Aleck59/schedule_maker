@@ -234,6 +234,31 @@ class LoadReport(UIPlugin):
 Каталог шаблонов плагина подключается перед основным, поэтому плагин может
 переопределить любой шаблон ядра, положив файл с тем же именем.
 
+### Блок на чужой странице
+
+Переопределять целую страницу ради одного блока — плохой обмен: чужие
+правки в неё потом не доедут. Поэтому страницы отводят место под
+дополнения, а плагин отдаёт для него свой шаблон:
+
+```python
+from schedule_maker.plugins.api import Panel, UIPlugin
+
+class Holidays(UIPlugin):
+    key = "ui.holidays"
+    title = "Праздники"
+
+    def public_panels(self, session, *, kind, subject_id):
+        # kind: чьё расписание открыли — group, teacher или room
+        if kind != "group":
+            return []
+        return [Panel(template="holidays/panel.html", data={"days": ...}, order=10)]
+```
+
+Шаблон получает переданное в `data` и всё, что есть на самой странице.
+Меньший `order` поднимает блок выше: важное должно быть видно до того,
+как человек начнёт листать сетку. Так устроены изменения расписания —
+студент видит отмену пары раньше, чем саму пару.
+
 ### Точки-события
 
 ```python
@@ -284,7 +309,22 @@ def test_поздняя_пятница():
 
 **Остальное.** `solver.greedy` · `export.xlsx` · `export.ics` · `export.csv` ·
 `import.teachers_xlsx` · `import.groups_xlsx` · `import.rooms_xlsx` ·
-`import.subjects_xlsx` · `source.ics_url`
+`import.subjects_xlsx` · `source.ics_url` · `plan.curriculum` ·
+`changes.emergency`
+
+`plan.curriculum` — учебный план и учёт часов. Это UI-плагин: он приносит
+свои таблицы, страницы и пункт меню, не трогая ядро. Чтение PDF требует
+дополнительной библиотеки, поэтому она вынесена в необязательную группу:
+
+```bash
+pip install 'schedule-maker[plan]'
+```
+
+Без неё плагин работает, но загрузка PDF честно скажет, чего не хватает.
+
+`changes.emergency` — экстренные изменения расписания. Тоже UI-плагин;
+кроме своих страниц он дописывает открытое расписание через
+`public_panels` — см. ниже.
 
 Полный список с описаниями — на странице `/admin/plugins` или командой
 `sm plugins`.

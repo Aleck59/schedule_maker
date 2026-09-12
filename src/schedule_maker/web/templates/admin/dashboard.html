@@ -1,86 +1,76 @@
 {% extends "admin/_layout.html" %}
 {% import "partials/ui.html" as ui %}
-{% block title %}Дашборд · {{ app_name }}{% endblock %}
+{% block title %}Главная · {{ app_name }}{% endblock %}
 {% block content %}
-{% call ui.page_header('Дашборд', 'Общее состояние расписания.', app_name) %}
-  <a href="/admin/builder" class="btn btn-primary">{{ ui.icon('layout-grid') }} Открыть конструктор</a>
+{% call ui.page_header('Главная', 'Что сейчас с расписанием и что требует внимания.') %}
+  <div class="btn-list">
+    <a href="/admin/diagnostics" class="btn">{{ ui.icon('alert-triangle') }} Проверить данные</a>
+    <a href="/admin/builder" class="btn btn-primary">{{ ui.icon('layout-grid') }} К расстановке</a>
+  </div>
 {% endcall %}
 
 {% if not report.ok %}
-<div class="alert alert-danger">
-  <div class="d-flex">
-    <div>{{ ui.icon('alert-triangle') }}</div>
-    <div class="ms-2">
-      <h4 class="alert-title">
-        Расписание не сойдётся: {{ plural(report.errors|length, "блокирующая ошибка", "блокирующие ошибки", "блокирующих ошибок") }}
-      </h4>
-      <div class="text-secondary">
-        Генератор запустится, но часть пар останется нерасставленной.
-        <a href="/admin/diagnostics">Посмотреть, что именно мешает</a>.
-      </div>
-    </div>
-  </div>
+<div class="alert alert-danger sm-alert-block">
+  <h4 class="alert-title">
+    Расписание не сложится: {{ plural(report.errors|length, 'помеха', 'помехи', 'помех') }}
+  </h4>
+  <p class="mb-0">
+    Программа попробует расставить занятия, но часть из них останется без места —
+    сколько бы раз вы ни запускали. <a href="/admin/diagnostics">Посмотреть, что мешает</a>.
+  </p>
 </div>
 {% elif report.warnings %}
 <div class="alert alert-warning">
-  {{ ui.icon('info-circle') }} {{ plural(report.warnings|length, "предупреждение", "предупреждения", "предупреждений") }}.
-  <a href="/admin/diagnostics">Подробности</a>.
+  {{ ui.icon('info-circle') }}
+  {{ plural(report.warnings|length, 'предупреждение', 'предупреждения', 'предупреждений') }} —
+  <a href="/admin/diagnostics">подробности</a>.
 </div>
 {% endif %}
 
-<div class="row row-deck row-cards mb-3">
-  {% set cards = [
-    ('Филиалы', stats.campuses, '/admin/campuses', 'map-pin'),
-    ('Аудитории', stats.rooms, '/admin/rooms', 'building-community'),
-    ('Группы', stats.groups, '/admin/groups', 'users'),
-    ('Преподаватели', stats.teachers, '/admin/teachers', 'user'),
-    ('Строк нагрузки', stats.demands, '/admin/demands', 'clipboard-list'),
-    ('Правил настроено', stats.rules, '/admin/constraints', 'shield-lock'),
+<div class="row row-cards mb-3">
+  {% set tiles = [
+    ('Филиалы', stats.campuses, '/admin/campuses', 'map-pin', 'primary'),
+    ('Аудитории', stats.rooms, '/admin/rooms', 'building-community', 'teal'),
+    ('Группы', stats.groups, '/admin/groups', 'users', 'indigo'),
+    ('Преподаватели', stats.teachers, '/admin/teachers', 'user', 'purple'),
+    ('Нагрузка', stats.demands, '/admin/demands', 'clipboard-list', 'orange'),
+    ('Ограничения', stats.rules, '/admin/constraints', 'shield-lock', 'green'),
   ] %}
-  {% for title, value, url, icon_name in cards %}
-  <div class="col-6 col-lg-2">
-    <a href="{{ url }}" class="card card-sm text-reset text-decoration-none">
-      <div class="card-body text-center">
-        <div class="text-secondary">{{ ui.icon(icon_name) }}</div>
-        <div class="h1 mb-0 mt-1">{{ value }}</div>
-        <div class="text-secondary small">{{ title }}</div>
-      </div>
-    </a>
-  </div>
+  {% for title, value, url, icon_name, tone in tiles %}
+    <div class="col-6 col-md-4 col-xxl-2">{{ ui.stat_tile(title, value, url, icon_name, tone) }}</div>
   {% endfor %}
 </div>
 
 <div class="row row-cards">
   <div class="col-lg-7">
     <div class="card mb-3">
-      <div class="card-header"><h3 class="card-title">Текущий черновик</h3></div>
-      <div class="card-body">
-        <div class="d-flex align-items-baseline">
-          <div class="h2 mb-0">{{ draft.name }}</div>
-          <div class="ms-auto text-secondary">{{ draft.semester }}</div>
-        </div>
-        <div class="progress progress-separated my-3">
-          {% set pct = (stats.placed / stats.required * 100) if stats.required else 0 %}
-          <div class="progress-bar bg-primary" style="width: {{ pct }}%"></div>
-        </div>
-        <div class="row text-center">
-          <div class="col">
-            <div class="h3 mb-0">{{ stats.placed }} / {{ stats.required }}</div>
-            <div class="text-secondary small">расставлено пар</div>
-          </div>
-          <div class="col">
-            <div class="h3 mb-0 {% if draft.hard_score %}text-danger{% else %}text-green{% endif %}">
-              {{ draft.hard_score }}</div>
-            <div class="text-secondary small">жёстких нарушений</div>
-          </div>
-          <div class="col">
-            <div class="h3 mb-0">{{ draft.soft_score }}</div>
-            <div class="text-secondary small">мягкий штраф</div>
-          </div>
+      <div class="card-header">
+        <h3 class="card-title">Черновик расписания</h3>
+        <div class="card-actions">
+          <span class="badge {{ 'bg-success text-white' if draft.hard_score == 0 else 'bg-danger text-white' }}">
+            {{ conflicts_phrase(draft.hard_score) }}
+          </span>
         </div>
       </div>
+      <div class="card-body">
+        <div class="d-flex align-items-baseline mb-2">
+          <div class="h2 mb-0">{{ draft.name }}</div>
+          {% if draft.semester %}<div class="ms-auto text-secondary">{{ draft.semester }}</div>{% endif %}
+        </div>
+
+        {% set pct = (stats.placed / stats.required * 100) if stats.required else 0 %}
+        <div class="progress mb-2">
+          <div class="progress-bar {{ 'bg-success' if pct >= 100 else 'bg-primary' }}"
+               style="width: {{ pct }}%" role="progressbar"
+               aria-valuenow="{{ stats.placed }}" aria-valuemin="0" aria-valuemax="{{ stats.required }}"></div>
+        </div>
+        <p class="mb-0">
+          Поставлено <strong>{{ stats.placed }}</strong> занятий из <strong>{{ stats.required }}</strong>
+          по недельной нагрузке.
+        </p>
+      </div>
       <div class="card-footer d-flex">
-        <a href="/admin/diagnostics" class="btn btn-link">Диагностика</a>
+        <a href="/admin/builder" class="btn btn-primary">Продолжить расстановку</a>
         <a href="/admin/versions" class="btn ms-auto">Версии и публикация</a>
       </div>
     </div>
@@ -91,12 +81,14 @@
       <div class="list-group list-group-flush">
         {% for d in top_diagnostics %}
         <div class="list-group-item">
-          <div class="d-flex">
-            <span class="text-{{ 'danger' if d.is_blocking else 'warning' }}">{{ ui.icon('alert-triangle') }}</span>
-            <div class="ms-2">
+          <div class="row align-items-start g-2">
+            <div class="col-auto">
+              <span class="text-{{ 'danger' if d.is_blocking else 'warning' }}">{{ ui.icon('alert-triangle') }}</span>
+            </div>
+            <div class="col">
               <div class="fw-bold">{{ d.title }}</div>
-              <div class="text-secondary small">{{ d.message }}</div>
-              {% if d.hint %}<div class="text-green small sm-diagnostic-hint">{{ d.hint }}</div>{% endif %}
+              <div>{{ d.message }}</div>
+              {% if d.hint %}<div class="mt-1 text-success">{{ d.hint }}</div>{% endif %}
             </div>
           </div>
         </div>
@@ -109,15 +101,18 @@
 
   <div class="col-lg-5">
     <div class="card mb-3">
-      <div class="card-header"><h3 class="card-title">Публикация</h3></div>
+      <div class="card-header"><h3 class="card-title">Что видят студенты</h3></div>
       <div class="card-body">
         {% if published %}
-          <p>Опубликовано: <strong>{{ published.name }}</strong></p>
-          <p class="text-secondary small">
-            Именно эту версию видят студенты и преподаватели на <a href="/">открытой странице</a>.
+          <p class="mb-1">Опубликовано: <strong>{{ published.name }}</strong></p>
+          <p class="mb-0">
+            Эту версию видят студенты и преподаватели на
+            <a href="/">открытой странице</a>. Правки в черновике туда не попадают,
+            пока вы не опубликуете их заново.
           </p>
         {% else %}
-          {{ ui.empty('Ничего не опубликовано', 'Открытый раздел пока пуст. Опубликуйте версию из раздела «Версии».') }}
+          {{ ui.empty('Ничего не опубликовано',
+                      'Открытая страница пока пуста. Опубликуйте версию в разделе «Версии».') }}
         {% endif %}
       </div>
     </div>
@@ -127,9 +122,9 @@
       <div class="list-group list-group-flush">
         {% for row in audit %}
         <div class="list-group-item py-2">
-          <div class="d-flex">
-            <div class="text-secondary small">{{ row.created_at.strftime('%d.%m %H:%M') }}</div>
-            <div class="ms-2 small">
+          <div class="row g-2">
+            <div class="col-auto text-secondary small">{{ row.created_at.strftime('%d.%m %H:%M') }}</div>
+            <div class="col small">
               <strong>{{ row.user_login }}</strong> — {{ row.action }} {{ row.entity|lower }}
               {% if row.detail %}<span class="text-secondary">«{{ row.detail }}»</span>{% endif %}
             </div>

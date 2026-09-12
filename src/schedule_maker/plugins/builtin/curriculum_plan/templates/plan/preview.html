@@ -1,0 +1,140 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Что нашлось в плане · {{ app_name }}{% endblock %}
+{% block content %}
+{% set flagged = rows | selectattr('flagged') | list | length %}
+{{ ui.page_header('Что нашлось в файле',
+    'Проверьте прочитанное и снимите галочки с лишних строк. В базу попадёт только отмеченное.',
+    source_name) }}
+
+<div class="alert sm-alert-block alert-{{ 'warning' if flagged else 'info' }}">
+  <h4 class="alert-title">
+    Прочитано {{ plural(rows|length, 'строка', 'строки', 'строк') }}
+    в {{ plural(doc.semesters|length, 'семестре', 'семестрах', 'семестрах') }}
+  </h4>
+  <p class="mb-0">
+    {% if flagged %}
+      У {{ plural(flagged, 'строки', 'строк', 'строк') }} что-то не сошлось — они помечены
+      и подняты наверх списка. Это обычное дело: план приходит сканом, а распознавание
+      путает похожие знаки. Поправьте название или часы прямо здесь.
+    {% else %}
+      Все строки прочитались без замечаний: часы сходятся, названия целые.
+      Всё равно пробегитесь глазами — документ распознавался автоматически.
+    {% endif %}
+  </p>
+</div>
+
+{% for warning in doc.warnings %}
+  <div class="alert alert-warning">{{ warning }}</div>
+{% endfor %}
+
+<form method="post" action="/admin/plan/preview/{{ token }}/save">
+  {{ ui.csrf(csrf_token) }}
+
+  <div class="card mb-3">
+    <div class="card-header"><h3 class="card-title">Как назвать этот план</h3></div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label" for="name">Название</label>
+          <input class="form-control" id="name" name="name" required
+                 value="{% if doc.speciality_code %}{{ doc.speciality_code }}{% if doc.start_year %}, набор {{ doc.start_year }}{% endif %}{% else %}{{ source_name }}{% endif %}">
+          {{ ui.hint('Под этим именем план будет виден в списке.') }}
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label" for="study_form">Форма обучения</label>
+          <select class="form-select" id="study_form" name="study_form">
+            {% for value, label in study_form_labels.items() %}
+              <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label" for="weeks_per_semester">Недель в семестре</label>
+          <input class="form-control" type="number" id="weeks_per_semester"
+                 name="weeks_per_semester" value="17" min="1" max="52">
+          {{ ui.hint('Нужно, чтобы перевести часы за семестр в пары в неделю.') }}
+        </div>
+      </div>
+      <label class="form-check">
+        <input class="form-check-input" type="checkbox" name="create_subjects" checked>
+        <span class="form-check-label">
+          Заводить дисциплины, которых ещё нет в справочнике
+        </span>
+      </label>
+      {{ ui.hint('Если снять галочку, строки останутся без дисциплины — привязать можно будет вручную.') }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Строки плана</h3>
+      <div class="card-actions">
+        <label class="form-check m-0">
+          <input class="form-check-input" type="checkbox" checked
+                 onchange="document.querySelectorAll('.sm-take').forEach(c => c.checked = this.checked)">
+          <span class="form-check-label">Отметить все</span>
+        </label>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th class="w-1">Брать</th>
+            <th>Сем.</th>
+            <th>Индекс</th>
+            <th>Дисциплина</th>
+            <th class="w-1">Лекции</th>
+            <th class="w-1">Практики</th>
+            <th class="w-1">Итого</th>
+            <th>Контроль</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in rows | sort(attribute='flagged', reverse=true) %}
+            {% set row = entry.row %}
+                        <tr{% if entry.flagged %} class="table-warning"{% endif %}>
+              <td>
+                <input class="form-check-input sm-take" type="checkbox"
+                       name="take-{{ entry.index }}" checked>
+              </td>
+              <td>
+                {{ row.semester }}
+                <div class="text-secondary">{{ row.course }} курс</div>
+              </td>
+              <td class="sm-mono">{{ row.index_code }}</td>
+              <td>
+                <input class="form-control form-control-sm" name="name-{{ entry.index }}"
+                       value="{{ row.name }}">
+                {% if entry.reason %}
+                  <div class="text-danger small mt-1">{{ ui.icon('alert-triangle') }} {{ entry.reason }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <input class="form-control form-control-sm sm-hours" type="number" min="0"
+                       name="lecture-{{ entry.index }}" value="{{ row.lecture }}">
+              </td>
+              <td>
+                <input class="form-control form-control-sm sm-hours" type="number" min="0"
+                       name="practice-{{ entry.index }}" value="{{ row.practice }}">
+              </td>
+              <td>
+                <input class="form-control form-control-sm sm-hours" type="number" min="0"
+                       name="total-{{ entry.index }}" value="{{ row.total }}">
+              </td>
+              <td>{{ control_form_labels[row.control] }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer d-flex">
+      <a href="/admin/plan" class="btn btn-link">Отмена</a>
+      <button class="btn btn-primary ms-auto" type="submit">
+        {{ ui.icon('device-floppy') }} Сохранить план
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

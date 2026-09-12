@@ -17,7 +17,7 @@
         {% for d in grid.days %}
           <td class="sm-cell">
             {% for item in grid.at(d, s) %}
-              {{ ui.lesson_card(item) }}
+              {{ ui.lesson_card(item, full_title=True) }}
             {% endfor %}
           </td>
         {% endfor %}
@@ -38,7 +38,7 @@
             <div class="sm-day-slot mb-2">
               <div class="sm-day-time">{{ grid.slot_labels[s] }}</div>
               <div class="sm-day-body">
-                {% for item in items %}{{ ui.lesson_card(item) }}{% endfor %}
+                {% for item in items %}{{ ui.lesson_card(item, full_title=True) }}{% endfor %}
               </div>
             </div>
           {% endfor %}

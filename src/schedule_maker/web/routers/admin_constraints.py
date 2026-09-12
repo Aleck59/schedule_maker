@@ -42,6 +42,18 @@ SCOPE_LABELS = {
     ConstraintScope.CAMPUS: "Филиал",
 }
 
+# Подсказка под выбором адресата. Отдельным текстом на каждый случай:
+# склонять «преподаватель» в шаблоне — верный способ получить «для
+# конкретного преподаватель».
+SCOPE_HINTS = {
+    ConstraintScope.TEACHER: "Правило для одного преподавателя сильнее общего.",
+    ConstraintScope.GROUP: "Правило для одной группы сильнее общего.",
+    ConstraintScope.ROOM: "Правило для одной аудитории сильнее общего.",
+    ConstraintScope.SUBJECT: "Правило для одной дисциплины сильнее общего.",
+    ConstraintScope.DEMAND: "Правило для одной строки плана сильнее общего.",
+    ConstraintScope.CAMPUS: "Правило для одного филиала сильнее общего.",
+}
+
 
 def form_fields(model: type[BaseModel]) -> list[dict[str, Any]]:
     """Описание полей формы из pydantic-модели параметров правила."""
@@ -124,6 +136,7 @@ def list_constraints(
         {
             "plugin": plugin,
             "scope_label": SCOPE_LABELS.get(plugin.scope, "Для всех"),
+            "scope_hint": SCOPE_HINTS.get(plugin.scope, ""),
             "enabled": plugin.key in enabled_keys,
             "always_on": plugin.always_on,
             "instances": sum(1 for r in rules if r.plugin_key == plugin.key),
@@ -172,6 +185,7 @@ def _form(request: Request, session: Session, rule: ConstraintRule | None, plugi
             "fields": form_fields(plugin.params_model) if plugin else [],
             "scope_options": scope_options(session, plugin.scope) if plugin else [],
             "scope_label": SCOPE_LABELS.get(plugin.scope, "Для всех") if plugin else "",
+            "scope_hint": SCOPE_HINTS.get(plugin.scope, "") if plugin else "",
             "params": (rule.params or {}) if rule else {},
         },
     )

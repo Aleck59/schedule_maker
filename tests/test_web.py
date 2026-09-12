@@ -364,5 +364,7 @@ def test_итог_генерации_виден_на_странице_конст
 
     page = admin_client.get("/admin/builder").text
     assert 'id="run-status"' in page
-    assert run.message in page
+    # На странице — человеческий пересказ итога, а не служебное run.message.
+    assert f"Поставлено {run.placed} " in page, "число поставленных занятий должно быть на виду"
+    assert f"Не удалось поставить {run.unplaced}." in page
     assert "рассмотренных вариантов" in page, "статистика отказов должна быть на странице"

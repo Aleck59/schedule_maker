@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     days_per_week: int = 6
     slots_per_day: int = 8
 
+    # Чётность недели считается по её номеру в году. Если в учебной части
+    # принят обратный счёт, этот переключатель меняет соответствие на
+    # противоположное, не трогая ни одну строку в базе.
+    first_week_is_odd: bool = True
+
     # Генератор
     solver_key: str = "solver.greedy"
     solver_seed: int = 42

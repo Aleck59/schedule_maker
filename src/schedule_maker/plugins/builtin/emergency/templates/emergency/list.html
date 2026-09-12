@@ -1,0 +1,193 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Изменения расписания · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Изменения расписания',
+    'Праздники, больничные, ремонт. Постоянное расписание остаётся как есть — меняются только отдельные дни.') }}
+
+<div class="row row-cards">
+  <div class="col-xl-5">
+    <form class="card" method="post" action="/admin/changes/new"
+          x-data="{ kind: 'holiday' }">
+      {{ ui.csrf(csrf_token) }}
+      <div class="card-header"><h3 class="card-title">Что случилось</h3></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label" for="kind">Причина</label>
+          <select class="form-select" id="kind" name="kind" x-model="kind">
+            {% for value, label in disruption_labels.items() %}
+              <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          {% for value, hint in disruption_hints.items() %}
+            <div class="form-hint" x-show="kind === '{{ value }}'" x-cloak>{{ hint }}.</div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="title">Как записать в расписании</label>
+          <input class="form-control" id="title" name="title" required
+                 placeholder="Например: День народного единства">
+          {{ ui.hint('Эту строку увидят студенты и преподаватели.') }}
+        </div>
+
+        <div class="row">
+          <div class="col-6 mb-3">
+            <label class="form-label" for="date_from">С какого дня</label>
+            <input class="form-control" type="date" id="date_from" name="date_from"
+                   value="{{ today.isoformat() }}" required>
+          </div>
+          <div class="col-6 mb-3">
+            <label class="form-label" for="date_to">По какой</label>
+            <input class="form-control" type="date" id="date_to" name="date_to">
+            {{ ui.hint('Пусто — значит один день.') }}
+          </div>
+        </div>
+
+        <div class="mb-3" x-show="kind === 'sick' || kind === 'trip'" x-cloak>
+          <label class="form-label" for="teacher_id">Преподаватель</label>
+          <select class="form-select" id="teacher_id" name="teacher_id">
+            <option value="">— не выбран —</option>
+            {% for t in teachers %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3" x-show="kind === 'repair'" x-cloak>
+          <label class="form-label" for="room_id">Аудитория</label>
+          <select class="form-select" id="room_id" name="room_id">
+            <option value="">— не выбрана —</option>
+            {% for r in rooms %}
+              <option value="{{ r.id }}">{{ r.name }} · {{ r.campus.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3" x-show="kind === 'quarantine'" x-cloak>
+          <label class="form-label" for="group_id">Группа</label>
+          <select class="form-select" id="group_id" name="group_id">
+            <option value="">— не выбрана —</option>
+            {% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3" x-show="kind === 'holiday' || kind === 'other'" x-cloak>
+          <label class="form-label" for="campus_id">Филиал</label>
+          <select class="form-select" id="campus_id" name="campus_id">
+            <option value="">все филиалы</option>
+            {% for c in campuses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+          {{ ui.hint('Если праздник касается только одного города.') }}
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label" for="note">Заметка для себя</label>
+          <input class="form-control" id="note" name="note"
+                 placeholder="Необязательно: номер приказа, кто сообщил">
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary" type="submit">
+          {{ ui.icon('search') }} Найти занятия
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="card mb-3">
+      <div class="card-header"><h3 class="card-title">Что впереди</h3></div>
+      {% if disruptions %}
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th>Когда</th>
+                <th>Что</th>
+                <th>Кого касается</th>
+                <th>Занятий</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disruptions %}
+                <tr>
+                  <td>
+                    {{ item.date_from.strftime('%d.%m') }}
+                    {% if not item.one_day %} — {{ item.date_to.strftime('%d.%m') }}{% endif %}
+                    <div class="text-secondary">{{ plural(item.days, 'день', 'дня', 'дней') }}</div>
+                  </td>
+                  <td>
+                    <a href="/admin/changes/{{ item.id }}" class="fw-bold">{{ item.title }}</a>
+                    <div>{{ ui.badge(disruption_labels[item.kind], 'secondary') }}</div>
+                  </td>
+                  <td>{{ item.target_label }}</td>
+                  <td>
+                    {% if counts[item.id] %}
+                      {{ ui.badge(plural(counts[item.id], 'изменение', 'изменения', 'изменений'), 'blue') }}
+                    {% else %}
+                      {{ ui.badge('решения нет', 'orange', 'Занятия ещё не разобраны') }}
+                    {% endif %}
+                  </td>
+                  <td class="sm-actions">
+                    <a href="/admin/changes/{{ item.id }}" class="btn btn-sm">Разобрать</a>
+                    <form method="post" action="/admin/changes/{{ item.id }}/delete"
+                          onsubmit="return confirm('Удалить «{{ item.title }}» и все изменения по нему?')">
+                      {{ ui.csrf(csrf_token) }}
+                      <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit"
+                              title="Удалить">{{ ui.icon('trash') }}</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body">
+          {{ ui.empty('Впереди всё спокойно',
+                      'Расписание идёт как обычно. Если что-то случится — запишите это слева.') }}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Изменения по дням</h3>
+        <div class="card-actions text-secondary">
+          на {{ plural(days, 'день', 'дня', 'дней') }} вперёд
+        </div>
+      </div>
+      {% if upcoming %}
+        <div class="list-group list-group-flush">
+          {% for day in upcoming %}
+            <div class="list-group-item">
+              <div class="fw-bold mb-1">
+                {{ day.on_date.strftime('%d.%m') }},
+                {{ day_names[day.on_date.weekday()]|lower }}
+              </div>
+              {% for change in day.items %}
+                <div class="d-flex align-items-start mb-1">
+                  <span class="me-2">{{ ui.badge(change_past[change.kind], change_colors[change.kind]) }}</span>
+                  <div class="flex-fill">
+                    {% if change.assignment %}
+                      <strong>{{ change.assignment.demand.subject.name }}</strong>
+                      · {{ change.assignment.demand.target_label }}
+                      · {{ change.assignment.slot_index + 1 }}-я пара
+                    {% endif %}
+                    <div class="text-secondary">{{ describe(change) }}</div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="card-body">
+          {{ ui.empty('Изменений нет',
+                      'Ближайшие дни идут по обычному расписанию.') }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

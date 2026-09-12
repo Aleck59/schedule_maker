@@ -1,0 +1,168 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ disruption.title }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header(disruption.title,
+    'Программа нашла занятия, которые попадают на эти дни. Решите, что с каждым делать.',
+    disruption_labels[disruption.kind]) %}
+  <a href="/admin/changes" class="btn">{{ ui.icon('arrow-left') }} Ко всем изменениям</a>
+{% endcall %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-auto">
+        <div class="text-secondary">Дни</div>
+        <div class="fw-bold">
+          {{ disruption.date_from.strftime('%d.%m.%Y') }}
+          {% if not disruption.one_day %} — {{ disruption.date_to.strftime('%d.%m.%Y') }}{% endif %}
+        </div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Кого касается</div>
+        <div class="fw-bold">{{ disruption.target_label }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Занятий задето</div>
+        <div class="fw-bold">{{ items | length }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Решено</div>
+        <div class="fw-bold">{{ handled }} из {{ items | length }}</div>
+      </div>
+      {% if disruption.note %}
+        <div class="col-12">
+          <div class="text-secondary">Заметка</div>
+          <div>{{ disruption.note }}</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if items %}
+  <form method="post" action="/admin/changes/{{ disruption.id }}/apply">
+    {{ ui.csrf(csrf_token) }}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Задетые занятия</h3>
+        <div class="card-actions text-secondary">
+          Заранее выбрано то, что подходит для этой причины — поправьте, где нужно.
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+            <tr>
+              <th>Когда</th>
+              <th>Занятие</th>
+              <th class="w-25">Что делаем</th>
+              <th>Подробности</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+              {% set a = item.assignment %}
+              {% set current = item.existing.kind if item.existing else item.suggested %}
+              <tr x-data="{ kind: '{{ current }}' }">
+                <td>
+                  <div class="fw-bold">{{ item.on_date.strftime('%d.%m') }}</div>
+                  <div class="text-secondary">
+                    {{ day_names[item.on_date.weekday()]|lower }}<br>
+                    {{ a.slot_index + 1 }}-я пара
+                  </div>
+                </td>
+                <td>
+                  <div class="fw-bold">{{ a.demand.subject.name }}</div>
+                  <div class="text-secondary">
+                    {{ a.demand.target_label }} ·
+                    {{ a.demand.teacher.short_name|keep_together }}
+                    {% if a.room %} · {{ a.room.name }}{% endif %}
+                  </div>
+                  {% if item.handled %}
+                    <div class="mt-1">
+                      {{ ui.badge('решение записано', 'green') }}
+                    </div>
+                  {% endif %}
+                </td>
+                <td>
+                  <select class="form-select form-select-sm"
+                          name="kind-{{ item.key }}" x-model="kind">
+                    {% for k in change_kinds %}
+                      <option value="{{ k }}" {% if current == k %}selected{% endif %}>
+                        {{ change_labels[k] }}
+                      </option>
+                    {% endfor %}
+                    <option value="keep">Оставить как есть</option>
+                  </select>
+                </td>
+                <td>
+                  <div x-show="kind === 'substitute'" x-cloak>
+                    <select class="form-select form-select-sm" name="new_teacher-{{ item.key }}">
+                      <option value="">— кто заменит —</option>
+                      {% for t in teachers %}
+                        <option value="{{ t.id }}"
+                                {% if item.existing and item.existing.new_teacher_id == t.id %}selected{% endif %}>
+                          {{ t.short_name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div x-show="kind === 'room'" x-cloak>
+                    <select class="form-select form-select-sm" name="new_room-{{ item.key }}">
+                      <option value="">— куда переедут —</option>
+                      {% for r in rooms %}
+                        <option value="{{ r.id }}"
+                                {% if item.existing and item.existing.new_room_id == r.id %}selected{% endif %}>
+                          {{ r.name }} · до {{ r.capacity }} мест
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div x-show="kind === 'move'" x-cloak>
+                    <div class="row g-1">
+                      <div class="col-7">
+                        <input class="form-control form-control-sm" type="date"
+                               name="new_date-{{ item.key }}"
+                               value="{{ item.existing.new_date.isoformat() if item.existing and item.existing.new_date else '' }}">
+                      </div>
+                      <div class="col-5">
+                        <select class="form-select form-select-sm" name="new_slot-{{ item.key }}">
+                          {% for s in slots %}
+                            <option value="{{ s }}"
+                                    {% if item.existing and item.existing.new_slot_index == s %}selected{% endif %}>
+                              {{ s + 1 }}-я пара
+                            </option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <input class="form-control form-control-sm mt-1" name="note-{{ item.key }}"
+                         placeholder="Что написать студентам"
+                         value="{{ item.existing.note if item.existing else '' }}">
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer d-flex">
+        <span class="text-secondary">
+          Записанное увидят студенты и преподаватели рядом с обычным расписанием.
+        </span>
+        <button class="btn btn-primary ms-auto" type="submit">
+          {{ ui.icon('device-floppy') }} Записать изменения
+        </button>
+      </div>
+    </div>
+  </form>
+{% else %}
+  <div class="card">
+    <div class="card-body">
+      {{ ui.empty('В эти дни занятий нет',
+                  'Расписание на выбранные дни ничего не теряет — менять нечего.') }}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

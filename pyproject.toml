@@ -32,12 +32,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Чтение учебного плана из PDF. Вынесено отдельно: библиотека тяжёлая,
+# а без загрузки планов программа работает полностью.
+plan = [
+    "pdfplumber>=0.11",
+]
 dev = [
     "pytest>=8.3",
     "pytest-cov>=6.0",
     "ruff>=0.8",
     "mypy>=1.13",
     "types-openpyxl",
+    "pdfplumber>=0.11",
 ]
 
 [project.scripts]

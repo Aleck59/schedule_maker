@@ -1,0 +1,151 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ plan.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% set flagged = items | selectattr('needs_review') | list | length %}
+{% call ui.page_header(plan.name,
+    'Закрепите за строками плана дисциплины, группы и преподавателей — после этого по плану можно создать нагрузку.',
+    'Учебный план') %}
+  <div class="btn-list">
+    <a href="/admin/plan/{{ plan.id }}/hours" class="btn">{{ ui.icon('clock') }} Учёт часов</a>
+    <form method="post" action="/admin/plan/{{ plan.id }}/demands" class="d-inline">
+      {{ ui.csrf(csrf_token) }}
+      <button class="btn btn-primary" type="submit">{{ ui.icon('list-check') }} Создать нагрузку</button>
+    </form>
+  </div>
+{% endcall %}
+
+{% if flagged %}
+  <div class="alert sm-alert-block alert-warning">
+    <h4 class="alert-title">{{ plural(flagged, 'строку', 'строки', 'строк') }} стоит проверить</h4>
+    <p class="mb-0">
+      При распознавании у этих строк не сошлись часы или пострадало название.
+      Они помечены значком в таблице — сверьтесь с бумажным планом.
+    </p>
+  </div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-auto">
+        <div class="text-secondary">Специальность</div>
+        <div class="fw-bold">{{ plan.speciality_code or '—' }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Год начала</div>
+        <div class="fw-bold">{{ plan.start_year or '—' }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Форма обучения</div>
+        <div class="fw-bold">{{ study_form_labels[plan.study_form] }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Недель в семестре</div>
+        <div class="fw-bold">{{ plan.weeks_per_semester }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Строк в плане</div>
+        <div class="fw-bold">{{ plan.items | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="text-secondary me-2">Семестр:</span>
+    <a href="/admin/plan/{{ plan.id }}"
+       class="btn btn-sm {{ 'btn-primary' if semester is none else '' }}">все</a>
+    {% for s in semesters %}
+      <a href="/admin/plan/{{ plan.id }}?semester={{ s }}"
+         class="btn btn-sm {{ 'btn-primary' if semester == s else '' }}">{{ s }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<form method="post" action="/admin/plan/{{ plan.id }}/assign">
+  {{ ui.csrf(csrf_token) }}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Строки плана</h3></div>
+    {% if items %}
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+            <tr>
+              <th>Сем.</th>
+              <th>Дисциплина по документу</th>
+              <th>Часы</th>
+              <th>Какая это дисциплина</th>
+              <th>Кто учится</th>
+              <th>Кто ведёт</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+              <tr>
+                <td>
+                  {{ item.semester }}
+                  <div class="text-secondary">{{ item.course }} курс</div>
+                </td>
+                <td>
+                  <div class="fw-bold">{{ item.raw_name }}</div>
+                  <div class="text-secondary sm-mono">{{ item.index_code }}</div>
+                  {% if item.needs_review %}
+                    <div class="text-warning small">
+                      {{ ui.icon('alert-triangle') }} распозналось неуверенно
+                    </div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.lecture_hours %}<div>лекции — {{ item.lecture_hours }}</div>{% endif %}
+                  {% if item.practice_hours %}<div>практики — {{ item.practice_hours }}</div>{% endif %}
+                  {% if item.lab_hours %}<div>лабораторные — {{ item.lab_hours }}</div>{% endif %}
+                  {% if not item.contact_hours %}<span class="text-secondary">нет занятий</span>{% endif %}
+                  {% if item.control_form != 'none' %}
+                    <div>{{ ui.badge(control_form_labels[item.control_form], 'blue') }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <select class="form-select form-select-sm" name="subject_id-{{ item.id }}">
+                    <option value="">— не выбрана —</option>
+                    {% for subject in subjects %}
+                      <option value="{{ subject.id }}"
+                              {% if item.subject_id == subject.id %}selected{% endif %}>{{ subject.name }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td>
+                  <select class="form-select form-select-sm" name="group_id-{{ item.id }}">
+                    <option value="">— не выбрана —</option>
+                    {% for group in groups %}
+                      <option value="{{ group.id }}"
+                              {% if item.group_id == group.id %}selected{% endif %}>{{ group.name }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td>
+                  <select class="form-select form-select-sm" name="teacher_id-{{ item.id }}">
+                    <option value="">— не назначен —</option>
+                    {% for teacher in teachers %}
+                      <option value="{{ teacher.id }}"
+                              {% if item.teacher_id == teacher.id %}selected{% endif %}>{{ teacher.short_name }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer d-flex">
+        <span class="text-secondary">
+          Нагрузка создастся только для строк, у которых выбраны все три поля.
+        </span>
+        <button class="btn btn-primary ms-auto" type="submit">
+          {{ ui.icon('device-floppy') }} Сохранить закрепление
+        </button>
+      </div>
+    {% else %}
+      <div class="card-body">{{ ui.empty('В этом семестре строк нет') }}</div>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

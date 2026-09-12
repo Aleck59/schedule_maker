@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from schedule_maker.deps import db_session
 from schedule_maker.enums import WeekParity
 from schedule_maker.models import Campus, Faculty, Room, StudentGroup, Teacher
+from schedule_maker.plugins.api import Panel
 from schedule_maker.plugins.registry import get_registry
 from schedule_maker.services.problem_builder import build_problem, load_timetable
 from schedule_maker.services.timetable_view import build_grid
@@ -100,8 +101,17 @@ def _show(
             "parity": parity,
             "ics_url": ics_url,
             "kind": kind,
+            "panels": _panels(session, kind, subject_id),
         },
     )
+
+
+def _panels(session: Session, kind: str, subject_id: int) -> list[Panel]:
+    """Дополнения от плагинов — например, изменения на ближайшие дни."""
+    found: list[Panel] = []
+    for plugin in get_registry().ui_plugins():
+        found.extend(plugin.public_panels(session, kind=kind, subject_id=subject_id))
+    return sorted(found, key=lambda panel: panel.order)
 
 
 @router.get("/g/{slug}", include_in_schema=False)

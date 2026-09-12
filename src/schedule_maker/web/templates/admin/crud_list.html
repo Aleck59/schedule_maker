@@ -31,7 +31,7 @@
               {% endif %}
             </td>
           {% endfor %}
-          <td class="text-end">
+          <td class="sm-actions">
             <a href="{{ spec.base_url }}/{{ item.id }}" class="btn btn-sm btn-icon">{{ ui.icon('pencil') }}</a>
             {% if spec.can_delete %}
             <form method="post" action="{{ spec.base_url }}/{{ item.id }}/delete" class="d-inline"

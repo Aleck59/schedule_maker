@@ -2,11 +2,14 @@
 {% import "partials/ui.html" as ui %}
 {% block title %}Конструктор · {{ app_name }}{% endblock %}
 {% block content %}
-{% call ui.page_header('Конструктор расписания', version.name, 'Расстановка') %}
+{% call ui.page_header(
+      'Расстановка занятий',
+      'Черновик «' ~ version.name ~ '». Изменения увидят только сотрудники, пока вы не опубликуете расписание.',
+      'Составление расписания') %}
   <div class="btn-list">
-    <a href="/admin/diagnostics" class="btn">{{ ui.icon('alert-triangle') }} Диагностика</a>
+    <a href="/admin/diagnostics" class="btn">{{ ui.icon('alert-triangle') }} Проверить данные</a>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generate-modal">
-      {{ ui.icon('wand') }} Сгенерировать
+      {{ ui.icon('wand') }} Составить автоматически
     </button>
   </div>
 {% endcall %}
@@ -15,7 +18,7 @@
   <div class="card-body">
     <form method="get" action="/admin/builder" class="row g-2 align-items-end">
       <div class="col-md-3">
-        <label class="form-label" for="kind">Показать расписание</label>
+        <label class="form-label" for="kind">Чьё расписание</label>
         <select class="form-select" id="kind" name="kind" onchange="this.form.submit()">
           <option value="group" {% if kind == 'group' %}selected{% endif %}>Группы</option>
           <option value="teacher" {% if kind == 'teacher' %}selected{% endif %}>Преподавателя</option>
@@ -24,7 +27,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label class="form-label" for="subject_id">Кого именно</label>
+        <label class="form-label" for="subject_id">Кого</label>
         <select class="form-select" id="subject_id" name="subject_id" onchange="this.form.submit()"
                 {% if kind == 'all' %}disabled{% endif %}>
           {% if kind == 'group' %}
@@ -50,7 +53,7 @@
           <option value="even" {% if parity == 'even' %}selected{% endif %}>Чётная</option>
         </select>
       </div>
-      <div class="col-md-2 text-end">
+      <div class="col-md-2">
         <a href="/admin/builder?kind={{ kind }}&subject_id={{ subject_id or '' }}&parity={{ parity }}"
            class="btn w-100">{{ ui.icon('refresh') }} Обновить</a>
       </div>
@@ -74,39 +77,41 @@
       <form method="post" action="/admin/builder/generate">
         {{ ui.csrf(csrf_token) }}
         <div class="modal-header">
-          <h5 class="modal-title">Запуск генерации</h5>
+          <h5 class="modal-title">Составить расписание автоматически</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <p>
+            Программа расставит занятия сама, соблюдая все запреты и стараясь
+            выполнить пожелания. Закреплённые занятия останутся на своих местах.
+          </p>
           <div class="mb-3">
-            <label class="form-label" for="solver_key">Движок</label>
+            <label class="form-label" for="solver_key">Способ составления</label>
             <select class="form-select" id="solver_key" name="solver_key">
               {% for s in solvers %}<option value="{{ s.key }}">{{ s.title }}</option>{% endfor %}
             </select>
-            <small class="form-hint">Список пополняется установкой плагинов-движков.</small>
+            {{ ui.hint('Список пополняется установкой дополнений.') }}
           </div>
           <div class="row">
-            <div class="col-6 mb-3">
-              <label class="form-label" for="seed">Зерно случайности</label>
+            <div class="col-sm-6 mb-3">
+              <label class="form-label" for="seed">Вариант расстановки</label>
               <input class="form-control" id="seed" name="seed" type="number" value="42">
-              <small class="form-hint">Одно зерно — один и тот же результат.</small>
+              {{ ui.hint('Другое число — другой вариант. Одно и то же число всегда даёт один и тот же результат.') }}
             </div>
-            <div class="col-6 mb-3">
-              <label class="form-label" for="time_limit">Лимит, секунд</label>
+            <div class="col-sm-6 mb-3">
+              <label class="form-label" for="time_limit">Сколько думать, секунд</label>
               <input class="form-control" id="time_limit" name="time_limit" type="number" value="60" min="5" max="600">
+              {{ ui.hint('Чем дольше, тем аккуратнее результат.') }}
             </div>
           </div>
           <label class="form-check">
             <input class="form-check-input" type="checkbox" name="clear_first" value="true" checked>
-            <span class="form-check-label">Очистить перед генерацией</span>
+            <span class="form-check-label">Сначала убрать всё незакреплённое</span>
           </label>
-          <div class="text-secondary small mt-1">
-            Закреплённые пары останутся на месте в любом случае.
-          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-link" data-bs-dismiss="modal">Отмена</button>
-          <button type="submit" class="btn btn-primary">{{ ui.icon('player-play') }} Запустить</button>
+          <button type="submit" class="btn btn-primary">{{ ui.icon('player-play') }} Составить</button>
         </div>
       </form>
     </div>

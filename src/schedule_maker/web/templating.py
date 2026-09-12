@@ -14,16 +14,29 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 
 from schedule_maker.config import get_settings
 from schedule_maker.enums import (
+    CHANGE_COLORS,
+    CHANGE_LABELS,
+    CHANGE_PAST,
+    CONTROL_FORM_LABELS,
+    CONTROL_FORM_SHORT,
     DAY_NAMES,
     DAY_SHORT,
     DELIVERY_LABELS,
+    DISRUPTION_HINTS,
+    DISRUPTION_LABELS,
     LESSON_TYPE_LABELS,
     LESSON_TYPE_SHORT,
     PARITY_LABELS,
     ROLE_LABELS,
     ROOM_KIND_LABELS,
+    STRICTNESS_LEVELS,
     STUDY_FORM_LABELS,
+    conflicts_phrase,
+    keep_together,
     plural,
+    remarks_phrase,
+    strictness_hint,
+    strictness_label,
 )
 from schedule_maker.plugins.registry import get_registry
 
@@ -45,6 +58,13 @@ def get_templates() -> Jinja2Templates:
             app_name=settings.app_name,
             day_names=DAY_NAMES,
             day_short=DAY_SHORT,
+            control_form_labels=CONTROL_FORM_LABELS,
+            disruption_labels=DISRUPTION_LABELS,
+            disruption_hints=DISRUPTION_HINTS,
+            change_labels=CHANGE_LABELS,
+            change_past=CHANGE_PAST,
+            change_colors=CHANGE_COLORS,
+            control_form_short=CONTROL_FORM_SHORT,
             study_form_labels=STUDY_FORM_LABELS,
             lesson_type_labels=LESSON_TYPE_LABELS,
             lesson_type_short=LESSON_TYPE_SHORT,
@@ -53,7 +73,14 @@ def get_templates() -> Jinja2Templates:
             delivery_labels=DELIVERY_LABELS,
             role_labels=ROLE_LABELS,
             plural=plural,
+            conflicts_phrase=conflicts_phrase,
+            keep_together=keep_together,
+            remarks_phrase=remarks_phrase,
+            strictness_label=strictness_label,
+            strictness_hint=strictness_hint,
+            strictness_levels=STRICTNESS_LEVELS,
         )
+        templates.env.filters["keep_together"] = keep_together
         _templates = templates
     return _templates
 
