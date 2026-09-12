@@ -14,6 +14,8 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 
 from schedule_maker.config import get_settings
 from schedule_maker.enums import (
+    CONTROL_FORM_LABELS,
+    CONTROL_FORM_SHORT,
     DAY_NAMES,
     DAY_SHORT,
     DELIVERY_LABELS,
@@ -51,6 +53,8 @@ def get_templates() -> Jinja2Templates:
             app_name=settings.app_name,
             day_names=DAY_NAMES,
             day_short=DAY_SHORT,
+            control_form_labels=CONTROL_FORM_LABELS,
+            control_form_short=CONTROL_FORM_SHORT,
             study_form_labels=STUDY_FORM_LABELS,
             lesson_type_labels=LESSON_TYPE_LABELS,
             lesson_type_short=LESSON_TYPE_SHORT,

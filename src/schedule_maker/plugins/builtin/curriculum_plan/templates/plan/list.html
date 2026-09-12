@@ -1,0 +1,93 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Учебный план · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Учебный план',
+    'Что за дисциплины и сколько по ним часов. Отсюда программа знает, сколько занятий нужно поставить и сколько часов ещё не разнесено.') }}
+
+{% if request.query_params.get('ok') %}
+  <div class="alert alert-success">{{ request.query_params['ok'] }}</div>
+{% endif %}
+{% if request.query_params.get('err') %}
+  <div class="alert alert-danger">{{ request.query_params['err'] }}</div>
+{% endif %}
+
+<div class="row row-cards">
+  <div class="col-lg-5">
+    <form class="card" method="post" action="/admin/plan/upload" enctype="multipart/form-data">
+      {{ ui.csrf(csrf_token) }}
+      <div class="card-header"><h3 class="card-title">Загрузить план</h3></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label" for="file">Файл учебного плана</label>
+          <input class="form-control" type="file" id="file" name="file" accept=".pdf" required>
+          {{ ui.hint('PDF с таблицей плана — та самая выгрузка, которую присылает учебная часть.') }}
+        </div>
+        <p class="text-secondary mb-0">
+          Программа прочитает файл и покажет, что в нём нашла: дисциплины,
+          семестры и часы. В базу ничего не попадёт, пока вы не подтвердите
+          прочитанное — сканы распознаются с ошибками, и проверить их должен
+          человек.
+        </p>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary" type="submit">{{ ui.icon('upload') }} Прочитать файл</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Загруженные планы</h3></div>
+      {% if plans %}
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th>План</th>
+                <th>Специальность</th>
+                <th>Строк</th>
+                <th>Недель в семестре</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for plan in plans %}
+                {% set count, flagged = counts[plan.id] %}
+                <tr>
+                  <td>
+                    <a href="/admin/plan/{{ plan.id }}" class="fw-bold">{{ plan.name }}</a>
+                    {% if flagged %}
+                      <div>{{ ui.badge(plural(flagged, 'строку стоит проверить', 'строки стоит проверить', 'строк стоит проверить'), 'orange') }}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ plan.speciality_code or '—' }}
+                    {% if plan.start_year %}<div class="text-secondary">с {{ plan.start_year }} года</div>{% endif %}
+                  </td>
+                  <td>{{ count }}</td>
+                  <td>{{ plan.weeks_per_semester }}</td>
+                  <td class="sm-actions">
+                    <a href="/admin/plan/{{ plan.id }}/hours" class="btn btn-sm">{{ ui.icon('clock') }} Учёт часов</a>
+                    <form method="post" action="/admin/plan/{{ plan.id }}/delete"
+                          onsubmit="return confirm('Удалить план «{{ plan.name }}» со всеми строками?')">
+                      {{ ui.csrf(csrf_token) }}
+                      <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit"
+                              title="Удалить план">{{ ui.icon('trash') }}</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body">
+          {{ ui.empty('Планов пока нет',
+                      'Загрузите PDF слева — программа разберёт его и покажет, что нашла.') }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

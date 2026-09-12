@@ -1,0 +1,142 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Учёт часов · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header('Учёт часов',
+    'Сколько часов положено по плану и сколько из них уже разнесено по занятиям.',
+    plan.name) %}
+  <a href="/admin/plan/{{ plan.id }}" class="btn">{{ ui.icon('arrow-left') }} К плану</a>
+{% endcall %}
+
+{% if request.query_params.get('ok') %}
+  <div class="alert alert-success">{{ request.query_params['ok'] }}</div>
+{% endif %}
+
+<div class="row row-cards mb-3">
+  <div class="col-6 col-lg-3">
+    {{ ui.stat_tile('Дано по плану', grand.planned, '#', 'clipboard-list', 'primary', 'часов') }}
+  </div>
+  <div class="col-6 col-lg-3">
+    {{ ui.stat_tile('Разнесено', grand.allocated, '#', 'list-check', 'teal', 'часов') }}
+  </div>
+  <div class="col-6 col-lg-3">
+    {{ ui.stat_tile('Осталось', grand.left, '/admin/demands', 'hourglass',
+                    'orange' if grand.left > 0 else 'green', 'часов') }}
+  </div>
+  <div class="col-6 col-lg-3">
+    {{ ui.stat_tile('Готово', grand.done_percent ~ '%', '#', 'percentage', 'indigo') }}
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">По видам занятий</h3></div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for lesson_type, line in totals.items() %}
+        <div class="col-md-4">
+          <div class="fw-bold">{{ lesson_type_labels[lesson_type] }}</div>
+          <div class="text-secondary mb-1">
+            дано {{ line.planned }} ч · разнесено {{ line.allocated }} ч ·
+            {% if line.left > 0 %}осталось {{ line.left }} ч{% elif line.left < 0 %}
+              <span class="text-danger">перебор на {{ -line.left }} ч</span>
+            {% else %}всё разнесено{% endif %}
+          </div>
+          <div class="progress progress-sm">
+            <div class="progress-bar bg-{{ 'danger' if line.overflow else 'primary' }}"
+                 style="width: {{ line.done_percent }}%"></div>
+          </div>
+        </div>
+      {% else %}
+        <div class="col-12">{{ ui.empty('Часов по плану пока нет') }}</div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card-footer">
+    <form method="post" action="/admin/plan/{{ plan.id }}/weeks" class="row g-2 align-items-end">
+      {{ ui.csrf(csrf_token) }}
+      <div class="col-auto">
+        <label class="form-label" for="weeks_per_semester">Недель в семестре</label>
+        <input class="form-control" type="number" id="weeks_per_semester" name="weeks_per_semester"
+               value="{{ plan.weeks_per_semester }}" min="1" max="52" style="width: 8rem">
+      </div>
+      <div class="col-auto">
+        <button class="btn" type="submit">Пересчитать</button>
+      </div>
+      <div class="col">
+        {{ ui.hint('Часы плана считаются за семестр, а расписание повторяется каждую неделю. Одна пара — ' ~ hours_per_pair ~ ' академических часа, поэтому недельная нагрузка умножается на число недель.') }}
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3 class="card-title">По дисциплинам</h3></div>
+  {% if rows %}
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th>Сем.</th>
+            <th>Дисциплина</th>
+            <th>Кто учится</th>
+            <th>Дано</th>
+            <th>Разнесено</th>
+            <th>Осталось</th>
+            <th class="w-25">Готовность</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            {% if row.total.planned or row.total.allocated %}
+              <tr>
+                <td>{{ row.item.semester }}</td>
+                <td>
+                  <div class="fw-bold">{{ row.item.display_name }}</div>
+                  <div class="text-secondary">
+                    {% for lesson_type, line in row.by_type.items() %}
+                      {{ lesson_type_labels[lesson_type]|lower }}: разнесено
+                      {{ line.allocated }} из {{ line.planned }} ч{% if not loop.last %} · {% endif %}
+                    {% endfor %}
+                  </div>
+                </td>
+                <td>
+                  {% if row.item.group %}{{ row.item.group.name }}
+                  {% else %}<span class="text-secondary">не выбрана</span>{% endif %}
+                </td>
+                <td>{{ row.total.planned }}</td>
+                <td>{{ row.total.allocated }}</td>
+                <td>
+                  {% if row.total.left > 0 %}
+                    <span class="text-orange fw-bold">{{ row.total.left }}</span>
+                  {% elif row.total.left < 0 %}
+                    <span class="text-danger fw-bold">+{{ -row.total.left }}</span>
+                  {% else %}
+                    {{ ui.badge('всё разнесено', 'green') }}
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="progress progress-sm">
+                    <div class="progress-bar bg-{{ 'danger' if row.total.overflow else 'primary' }}"
+                         style="width: {{ row.total.done_percent }}%"></div>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer text-secondary">
+      «Дано» — часы из учебного плана. «Разнесено» — во что они превратились
+      в недельной нагрузке: пары в неделю × {{ hours_per_pair }} часа ×
+      {{ plan.weeks_per_semester }} недель. Красное число означает, что занятий
+      поставлено больше, чем положено по плану.
+    </div>
+  {% else %}
+    <div class="card-body">
+      {{ ui.empty('Считать пока нечего',
+                  'Закрепите за строками плана дисциплины и группы — тогда станет видно, сколько часов разнесено.') }}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

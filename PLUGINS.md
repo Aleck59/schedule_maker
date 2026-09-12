@@ -284,7 +284,17 @@ def test_поздняя_пятница():
 
 **Остальное.** `solver.greedy` · `export.xlsx` · `export.ics` · `export.csv` ·
 `import.teachers_xlsx` · `import.groups_xlsx` · `import.rooms_xlsx` ·
-`import.subjects_xlsx` · `source.ics_url`
+`import.subjects_xlsx` · `source.ics_url` · `plan.curriculum`
+
+`plan.curriculum` — учебный план и учёт часов. Это UI-плагин: он приносит
+свои таблицы, страницы и пункт меню, не трогая ядро. Чтение PDF требует
+дополнительной библиотеки, поэтому она вынесена в необязательную группу:
+
+```bash
+pip install 'schedule-maker[plan]'
+```
+
+Без неё плагин работает, но загрузка PDF честно скажет, чего не хватает.
 
 Полный список с описаниями — на странице `/admin/plugins` или командой
 `sm plugins`.

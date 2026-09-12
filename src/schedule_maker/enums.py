@@ -27,6 +27,16 @@ class LessonType(StrEnum):
     EXAM = "exam"  # зачёт/экзамен
 
 
+class ControlForm(StrEnum):
+    """Форма промежуточного контроля из учебного плана."""
+
+    NONE = "none"  # без аттестации в этом семестре
+    CREDIT = "credit"  # зачёт
+    GRADED_CREDIT = "graded_credit"  # зачёт с оценкой
+    EXAM = "exam"  # экзамен
+    COURSEWORK = "coursework"  # курсовая работа или проект
+
+
 class DeliveryMode(StrEnum):
     """Формат проведения."""
 
@@ -152,6 +162,21 @@ LESSON_TYPE_SHORT: dict[str, str] = {
     LessonType.CONSULT: "Конс",
     LessonType.EXAM: "Экз",
 }
+CONTROL_FORM_LABELS: dict[str, str] = {
+    ControlForm.NONE: "Без аттестации",
+    ControlForm.CREDIT: "Зачёт",
+    ControlForm.GRADED_CREDIT: "Зачёт с оценкой",
+    ControlForm.EXAM: "Экзамен",
+    ControlForm.COURSEWORK: "Курсовая работа",
+}
+CONTROL_FORM_SHORT: dict[str, str] = {
+    ControlForm.NONE: "—",
+    ControlForm.CREDIT: "зач.",
+    ControlForm.GRADED_CREDIT: "зач. с оц.",
+    ControlForm.EXAM: "экз.",
+    ControlForm.COURSEWORK: "курс.",
+}
+
 ROOM_KIND_LABELS: dict[str, str] = {
     RoomKind.LECTURE_HALL: "Лекционная",
     RoomKind.SEMINAR: "Семинарская",

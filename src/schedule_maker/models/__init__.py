@@ -8,6 +8,7 @@ from schedule_maker.models.academic import (
     Subgroup,
 )
 from schedule_maker.models.base import Base
+from schedule_maker.models.curriculum import Curriculum, CurriculumItem
 from schedule_maker.models.org import BellSlot, Campus, CampusTravel, Faculty, Room, Subject
 from schedule_maker.models.people import Teacher, TeacherAvailability, TeacherRequest, User
 from schedule_maker.models.schedule import (
@@ -31,6 +32,8 @@ __all__ = [
     "Campus",
     "CampusTravel",
     "ConstraintRule",
+    "Curriculum",
+    "CurriculumItem",
     "ExternalBusy",
     "ExternalSource",
     "Faculty",
