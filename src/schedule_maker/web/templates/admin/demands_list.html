@@ -2,8 +2,10 @@
 {% import "partials/ui.html" as ui %}
 {% block title %}Учебный план · {{ app_name }}{% endblock %}
 {% block content %}
-{% call ui.page_header('Учебный план', 'Что, кому и сколько пар нужно поставить.', 'Нагрузка') %}
-  <a href="/admin/demands/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить нагрузку</a>
+{% call ui.page_header(
+      'Учебный план',
+      'Что, кому и сколько занятий нужно поставить за неделю. Из этих записей программа и собирает расписание.') %}
+  <a href="/admin/demands/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить занятия</a>
 {% endcall %}
 
 <div class="card mb-3">
@@ -37,16 +39,19 @@
 
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">Строк: {{ demands|length }}, пар суммарно: {{ total_pairs }}</h3>
+    <h3 class="card-title">
+      {{ plural(demands|length, 'запись', 'записи', 'записей') }} ·
+      {{ plural(total_pairs, 'занятие', 'занятия', 'занятий') }} в неделю
+    </h3>
   </div>
   {% if demands %}
   <div class="table-responsive">
     <table class="table table-vcenter card-table table-hover">
       <thead>
         <tr>
-          <th>Дисциплина</th><th>Кому</th><th>Преподаватель</th><th>Вид</th>
-          <th class="text-center">Пар</th><th class="text-center">В день</th>
-          <th>Особенности</th><th class="w-1"></th>
+          <th>Дисциплина</th><th>Кому</th><th>Преподаватель</th><th>Вид занятия</th>
+          <th>В неделю</th><th>Не больше в день</th>
+          <th>Особые условия</th><th class="w-1"></th>
         </tr>
       </thead>
       <tbody>
@@ -54,20 +59,23 @@
         <tr {% if not d.is_active %}class="opacity-50"{% endif %}>
           <td><a href="/admin/demands/{{ d.id }}" class="text-reset">{{ d.subject.name }}</a></td>
           <td>{{ d.target_label }}</td>
-          <td>{{ d.teacher.short_name }}</td>
+          <td>{{ d.teacher.short_name|keep_together }}</td>
           <td>{{ lesson_type_labels[d.lesson_type] }}</td>
-          <td class="text-center">{{ d.pairs_total }}</td>
-          <td class="text-center">{{ d.pairs_per_day_max }}</td>
+          <td>{{ d.pairs_total }}</td>
+          <td>{{ d.pairs_per_day_max }}</td>
           <td>
             {% if d.week_parity != 'any' %}{{ ui.badge(parity_labels[d.week_parity], 'yellow') }}{% endif %}
             {% if d.delivery_mode == 'online' %}{{ ui.badge('онлайн', 'azure') }}{% endif %}
             {% if d.required_room_kind != 'any' %}{{ ui.badge(room_kind_labels[d.required_room_kind], 'purple') }}{% endif %}
-            {% if d.fixed_slot_index is not none %}{{ ui.badge('пара №' ~ (d.fixed_slot_index + 1), 'red', 'Жёсткий временной слот') }}{% endif %}
-            {% if d.fixed_day_of_week is not none %}{{ ui.badge(day_short[d.fixed_day_of_week], 'red') }}{% endif %}
-            {% if d.stream_id %}{{ ui.badge('поток', 'purple') }}{% endif %}
+            {% if d.fixed_slot_index is not none %}
+              {{ ui.badge('строго ' ~ (d.fixed_slot_index + 1) ~ '-я пара', 'red', 'Занятие идёт только в это время') }}
+            {% endif %}
+            {% if d.fixed_day_of_week is not none %}
+              {{ ui.badge('только ' ~ day_short[d.fixed_day_of_week], 'red') }}
+            {% endif %}
             {% for tag in d.tag_list %}{{ ui.badge(tag, 'secondary') }}{% endfor %}
           </td>
-          <td class="text-end">
+          <td class="sm-actions">
             <a href="/admin/demands/{{ d.id }}" class="btn btn-sm btn-icon">{{ ui.icon('pencil') }}</a>
             <form method="post" action="/admin/demands/{{ d.id }}/delete" class="d-inline"
                   onsubmit="return confirm('Удалить строку нагрузки?')">

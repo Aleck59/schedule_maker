@@ -52,6 +52,9 @@ class Grid:
     days: list[int]
     slots: list[int]
     slot_labels: dict[int, str]
+    #: Только время, без номера пары: «08:00–09:30». Номер выводится отдельно,
+    #: иначе подпись не помещается в узкую колонку.
+    slot_times: dict[int, str] = field(default_factory=dict)
     cells: dict[tuple[int, int], list[GridItem]] = field(default_factory=dict)
     title: str = ""
     subtitle: str = ""
@@ -85,6 +88,15 @@ class Grid:
     @property
     def is_empty(self) -> bool:
         return self.total == 0
+
+
+def _time_only(problem: Problem, index: int) -> str:
+    """«08:00–09:30» — из сетки звонков, без номера пары."""
+    times = problem.slot_minutes.get(index)
+    if not times:
+        return ""
+    start, end = times
+    return f"{start // 60:02d}:{start % 60:02d}–{end // 60:02d}:{end % 60:02d}"
 
 
 def _badges_for(demand) -> list:
@@ -155,6 +167,7 @@ def build_grid(
         days=list(range(problem.days)),
         slots=list(range(problem.slots)),
         slot_labels={i: problem.slot_label(i) for i in range(problem.slots)},
+        slot_times={i: _time_only(problem, i) for i in range(problem.slots)},
         title=title,
         subtitle=subtitle,
     )

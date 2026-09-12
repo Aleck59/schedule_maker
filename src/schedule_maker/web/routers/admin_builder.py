@@ -155,8 +155,11 @@ def _context(
         "teachers": list(session.scalars(select(Teacher).order_by(Teacher.full_name))),
         "rooms": list(session.scalars(select(Room).order_by(Room.code))),
         "violations": violations,
+        # Считаем нарушения штуками, а не суммой весов: сумма — величина
+        # для сравнения вариантов внутри генератора, человеку она ничего
+        # не говорит.
         "hard_count": sum(1 for v in violations if v.is_hard),
-        "soft_total": sum(v.weight for v in violations if not v.is_hard),
+        "remark_count": sum(1 for v in violations if not v.is_hard),
         "last_run": last_run,
         "solvers": get_registry().solvers(),
         "message": message,

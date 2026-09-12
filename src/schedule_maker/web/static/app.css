@@ -1,82 +1,245 @@
-/* Собственные стили поверх Tabler. Всё, что не покрывается готовыми классами. */
+/* Собственные стили поверх Tabler.
+ *
+ * Две вещи, которые здесь исправляются по сравнению с настройками Tabler
+ * по умолчанию:
+ *
+ * 1. Основной цвет текста у Tabler — серый #6b7280, и мелкие подписи на белом
+ *    читаются плохо. Расписание смотрят десятки людей с разных экранов,
+ *    поэтому текст сделан темнее, а «вторичный» — действительно вторичным.
+ * 2. Немного цвета: цветные значки на плитках, мягкие градиенты в шапке и
+ *    на кнопке действия. Цвет здесь помогает ориентироваться, а не украшает:
+ *    дисциплина узнаётся по цвету карточки, состояние — по цвету плашки.
+ */
 
 :root {
-  --sm-cell-min-height: 84px;
-  --sm-grid-border: var(--tblr-border-color);
+  --tblr-body-color: #374151;
+  --tblr-secondary: #5b6573;
+
+  --sm-muted: #667085;
+  --sm-cell-min-height: 78px;
+  --sm-slot-head-width: 104px;
+
+  --sm-accent-from: #206bc4;
+  --sm-accent-to: #4299e1;
 }
 
-/* ---------- Карточка пары ---------- */
+[data-bs-theme="dark"] {
+  --tblr-body-color: #e5e7eb;
+  --tblr-secondary: #9aa4b2;
+  --sm-muted: #9aa4b2;
+}
+
+.text-secondary { color: var(--tblr-secondary) !important; }
+
+/* ---------- Шапка страницы ---------- */
+
+.page-title { margin-bottom: 0; }
+
+.page-subtitle {
+  margin-top: .35rem;
+  color: var(--sm-muted);
+  font-size: .875rem;
+  line-height: 1.45;
+  max-width: 62ch;
+}
+
+.page-header { padding-block: 1.25rem .25rem; }
+
+/* Лёгкий цветной фон вверху страницы: интерфейс перестаёт быть плоско-белым,
+   но текст остаётся на почти белом и не теряет контраст. */
+.page-wrapper > .page-header:first-child,
+.page-wrapper .page-header {
+  background: linear-gradient(180deg,
+              color-mix(in srgb, var(--sm-accent-from) 6%, transparent),
+              transparent);
+}
+
+/* ---------- Шапка карточки ---------- */
+/* В Tabler в card-header лежит только заголовок, поэтому пояснения
+   выносятся в тело карточки, а не ставятся рядом с названием. */
+
+.card-header .card-title { margin-bottom: 0; }
+.card-header .card-actions { display: flex; align-items: center; gap: .25rem; }
+
+/* ---------- Плитки с числами ---------- */
+
+.sm-stat { transition: transform .12s ease, box-shadow .12s ease; }
+.sm-stat:hover { transform: translateY(-1px); box-shadow: var(--tblr-box-shadow); }
+
+.sm-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: .5rem;
+  color: #fff;
+}
+.sm-stat-icon .icon { width: 1.25rem; height: 1.25rem; margin: 0; }
+
+.sm-stat-icon-primary { background: linear-gradient(135deg, #206bc4, #4299e1); }
+.sm-stat-icon-green   { background: linear-gradient(135deg, #2fb344, #74c96b); }
+.sm-stat-icon-purple  { background: linear-gradient(135deg, #ae3ec9, #c964e0); }
+.sm-stat-icon-orange  { background: linear-gradient(135deg, #f76707, #f9a03f); }
+.sm-stat-icon-teal    { background: linear-gradient(135deg, #0ca678, #38c9a3); }
+.sm-stat-icon-indigo  { background: linear-gradient(135deg, #4263eb, #748ffc); }
+
+.sm-stat-value { font-size: 1.5rem; font-weight: 600; line-height: 1.1; color: var(--tblr-heading-color); }
+.sm-stat-title { font-size: .8125rem; color: var(--sm-muted); }
+.sm-stat-note { font-size: .75rem; margin-top: .15rem; }
+
+/* Подпись плитки не должна рваться посреди слова («Преподават/ели»).
+   Пусть лучше плитка станет выше, чем слово — нечитаемым. */
+.sm-stat-title,
+.sm-stat-note { overflow-wrap: normal; word-break: keep-all; hyphens: none; }
+
+/* Плитки в ряду выравниваются по высоте самой высокой: ряд из шести штук
+   с подписями в одну и в две строки иначе выглядит рваным. */
+.sm-stat { height: 100%; }
+
+/* ---------- Карточка занятия ---------- */
 
 .sm-lesson {
-  border-radius: var(--tblr-border-radius);
-  padding: .35rem .5rem;
-  margin-bottom: .25rem;
-  font-size: .8125rem;
-  line-height: 1.25;
+  --sm-tone: var(--tblr-blue);
   position: relative;
+  border-radius: .375rem;
+  border-left: 3px solid var(--sm-tone);
+  background: color-mix(in srgb, var(--sm-tone) 9%, var(--tblr-bg-surface));
+  padding: .35rem .45rem;
+  margin-bottom: .3rem;
+  font-size: .8125rem;
+  line-height: 1.3;
 }
 
-.sm-lesson-title { font-weight: 600; }
-.sm-lesson-meta { color: var(--tblr-secondary); font-size: .75rem; }
-.sm-lesson-badges { display: flex; flex-wrap: wrap; gap: .15rem; margin-top: .2rem; }
-.sm-lesson-badges .badge { font-size: .625rem; padding: .1rem .3rem; }
+.sm-lesson-title {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--sm-tone) 65%, var(--tblr-gray-900));
+}
+.sm-lesson-teacher { color: var(--tblr-body-color); }
+.sm-lesson-place { color: var(--sm-muted); font-size: .75rem; }
+
+.sm-lesson-marks { display: flex; flex-wrap: wrap; gap: .2rem; margin-top: .25rem; }
+
+.sm-mark {
+  font-size: .6875rem;
+  line-height: 1.35;
+  padding: 0 .3rem;
+  border-radius: .25rem;
+  background: color-mix(in srgb, var(--sm-tone) 18%, var(--tblr-bg-surface));
+  color: color-mix(in srgb, var(--sm-tone) 70%, var(--tblr-gray-900));
+  white-space: nowrap;
+}
+.sm-mark-week   { background: #fff3bf; color: #8c6d1f; }
+.sm-mark-online { background: #d0ebff; color: #1864ab; }
+.sm-mark-stream { background: #f3d9fa; color: #862e9c; }
+.sm-mark-locked { background: #e9ecef; color: #343a40; }
+.sm-mark-plugin { background: #e7f5ff; color: #1971c2; }
+
+.sm-lesson.sm-locked { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tblr-gray-900) 35%, transparent); }
+.sm-lesson.sm-conflict { outline: 2px solid var(--tblr-danger); outline-offset: 1px; }
 
 .sm-draggable { cursor: grab; }
 .sm-draggable:active { cursor: grabbing; }
-.sm-lesson.sm-locked { box-shadow: inset 0 0 0 1px var(--tblr-dark); }
-.sm-lesson[data-conflict] { outline: 2px solid var(--tblr-danger); outline-offset: 1px; }
+.sm-dragging { opacity: .35; }
+
+/* Цвета дисциплин. Название берётся из справочника, поэтому список должен
+   совпадать с выпадающим списком в карточке дисциплины. */
+.sm-tone-blue      { --sm-tone: #206bc4; }
+.sm-tone-azure     { --sm-tone: #4299e1; }
+.sm-tone-indigo    { --sm-tone: #4263eb; }
+.sm-tone-purple    { --sm-tone: #ae3ec9; }
+.sm-tone-pink      { --sm-tone: #d6336c; }
+.sm-tone-red       { --sm-tone: #d63939; }
+.sm-tone-orange    { --sm-tone: #f76707; }
+.sm-tone-yellow    { --sm-tone: #f59f00; }
+.sm-tone-lime      { --sm-tone: #74b816; }
+.sm-tone-green     { --sm-tone: #2fb344; }
+.sm-tone-teal      { --sm-tone: #0ca678; }
+.sm-tone-cyan      { --sm-tone: #17a2b8; }
+.sm-tone-dark      { --sm-tone: #414d5a; }
+.sm-tone-secondary { --sm-tone: #5b6573; }
+
+/* Кнопки на занятии появляются при наведении, чтобы не шуметь в сетке. */
+.sm-lesson-tools {
+  display: flex;
+  gap: .15rem;
+  justify-content: flex-end;
+  margin: -.25rem 0 .4rem;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+.sm-cell-body:hover .sm-lesson-tools,
+.sm-lesson-tools:focus-within { opacity: 1; }
+.sm-lesson-tools .btn { --tblr-btn-padding-y: .1rem; --tblr-btn-padding-x: .25rem; }
+.sm-lesson-tools .icon { width: 1rem; height: 1rem; }
 
 /* ---------- Сетка расписания ---------- */
 
 .sm-grid {
   width: 100%;
-  min-width: 860px; /* иначе на узком экране колонки схлопываются в столбик букв */
+  /* Ширина подобрана так, чтобы «Абдуллаева П. О.» помещалась в колонку дня
+     одной строкой. Уже — и браузер начинает рвать фамилию пополам. */
+  min-width: 1000px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
+
+/* Колонка времени узкая и постоянной ширины: всё остальное место достаётся
+   дням, где и стоят карточки. */
+.sm-grid th:first-child,
+.sm-grid td:first-child { width: 88px; }
+
 .sm-grid th,
-.sm-grid td { border: 1px solid var(--sm-grid-border); vertical-align: top; padding: .25rem; }
-.sm-grid thead th { background: var(--tblr-bg-surface-secondary); text-align: center; font-size: .8125rem; }
-.sm-grid .sm-slot-head {
-  width: 96px;
-  background: var(--tblr-bg-surface-secondary);
-  font-size: .6875rem;
-  font-weight: 500;
-  line-height: 1.3;
-  white-space: normal;
+.sm-grid td {
+  border-bottom: 1px solid var(--tblr-border-color);
+  border-right: 1px solid var(--tblr-border-color);
+  vertical-align: top;
+  padding: .3rem;
 }
-.sm-cell { min-height: var(--sm-cell-min-height); height: var(--sm-cell-min-height); }
+.sm-grid tr > *:first-child { border-left: 0; }
+.sm-grid tr > *:last-child { border-right: 0; }
+
+.sm-grid thead th {
+  background: var(--tblr-bg-surface-secondary);
+  color: var(--tblr-heading-color);
+  text-align: center;
+  font-size: .8125rem;
+  font-weight: 600;
+  padding-block: .5rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.sm-grid .sm-slot-head {
+  width: var(--sm-slot-head-width);
+  background: var(--tblr-bg-surface-secondary);
+  text-align: left;
+  font-weight: 500;
+}
+.sm-slot-number { display: block; font-size: .75rem; color: var(--tblr-heading-color); }
+.sm-slot-time { display: block; font-size: .6875rem; color: var(--sm-muted); white-space: nowrap; }
+
+.sm-cell-body { min-height: var(--sm-cell-min-height); }
 
 /* Подсветка при перетаскивании: куда можно, куда нельзя. */
-.sm-cell.sm-allowed { background: var(--tblr-success-lt); }
-.sm-cell.sm-forbidden { background: var(--tblr-danger-lt); opacity: .55; }
+.sm-cell.sm-allowed { background: color-mix(in srgb, var(--tblr-green) 12%, transparent); }
+.sm-cell.sm-forbidden { background: color-mix(in srgb, var(--tblr-red) 8%, transparent); }
+.sm-cell.sm-forbidden .sm-lesson { opacity: .45; }
 .sm-cell.sm-over { outline: 2px dashed var(--tblr-primary); outline-offset: -2px; }
 
-.sm-pool { max-height: 70vh; overflow-y: auto; }
+.sm-pool { min-height: 3rem; max-height: 62vh; overflow-y: auto; }
 .sm-pool:empty::after {
-  content: "Все пары расставлены";
+  content: "Все занятия расставлены";
   display: block;
-  padding: 1rem;
-  color: var(--tblr-secondary);
+  padding: 1rem .5rem;
+  color: var(--sm-muted);
   text-align: center;
+  font-size: .8125rem;
 }
 
-.sm-dragging { opacity: .4; }
-
-/* ---------- Печать ---------- */
-
-@media print {
-  .sm-grid { font-size: 10pt; }
-  .sm-lesson { break-inside: avoid; }
-  .page-wrapper { margin: 0; }
-}
-
-/* ---------- Мелочи ---------- */
-
-.sm-diagnostic-hint { font-size: .8125rem; }
-.sm-mono { font-family: var(--tblr-font-monospace); font-size: .8125rem; }
-.sm-sticky-head thead th { position: sticky; top: 0; z-index: 2; }
+.sm-scroll-list { max-height: 42vh; overflow-y: auto; }
 
 /* ---------- Расписание на телефоне ---------- */
 
@@ -86,15 +249,28 @@
 .sm-day-card .sm-day-time {
   flex: 0 0 5.5rem;
   font-size: .75rem;
-  color: var(--tblr-secondary);
+  color: var(--sm-muted);
   padding-top: .35rem;
 }
 .sm-day-card .sm-day-body { flex: 1 1 auto; min-width: 0; }
 
-/* Иконка в кнопке или ссылке не должна прилипать к тексту.
-   Псевдокласс :only-child здесь не подходит: текст рядом с иконкой — это
-   текстовый узел, а не элемент, так что кнопка с подписью тоже под него
-   попадает. Поэтому кнопки без подписи помечаются классом btn-icon. */
+/* ---------- Мелочи ---------- */
+
+/* В Tabler .alert — flex-контейнер: так иконка встаёт в строку с текстом.
+   Когда внутри нужен столбик (заголовок, пояснение, подробности),
+   помечаем блок этим классом. */
+.alert.sm-alert-block { display: block; }
+
+/* Tabler красит весь текст предупреждения в цвет самого предупреждения.
+   Для заголовка это уместно, для абзаца — нет: оранжевый текст на кремовом
+   фоне читается плохо. Оставляем цвет только заголовку и ссылкам. */
+.alert.sm-alert-block .alert-title { color: var(--tblr-alert-color, inherit); }
+.alert.sm-alert-block > *:not(.alert-title) { color: var(--tblr-body-color); }
+.alert.sm-alert-block a { color: var(--tblr-link-color); }
+
+/* Иконка в кнопке или ссылке не должна прилипать к тексту. Псевдокласс
+   :only-child здесь не годится: текст рядом с иконкой — это текстовый узел,
+   а не элемент. Поэтому кнопки без подписи помечаются классом btn-icon. */
 .btn .icon,
 .nav-link .icon,
 .alert > .icon,
@@ -102,7 +278,46 @@
 .btn-icon .icon,
 .navbar-brand .icon { margin-right: 0; }
 
-/* В Tabler .alert — flex-контейнер: так иконка становится в строку с текстом.
-   Когда внутри нужен именно столбик (заголовок, пояснение, подробности),
-   помечаем блок этим классом. */
-.alert.sm-alert-block { display: block; }
+/* Кнопки в строке таблицы стоят в ряд и не переносятся: иначе карандаш и
+   корзина встают друг под другом и строка вырастает вдвое. Ширина 1% —
+   приём Bootstrap: колонка сжимается по содержимому. */
+td.sm-actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+td.sm-actions > * { display: inline-block; vertical-align: middle; }
+td.sm-actions > * + * { margin-left: .25rem; }
+
+/* Пока Alpine не поднялся, элементы с x-show ещё не спрятаны. Без этого
+   правила все варианты подсказки видны одновременно доли секунды. */
+[x-cloak] { display: none !important; }
+
+.sm-mono { font-family: var(--tblr-font-monospace); font-size: .8125rem; color: var(--sm-muted); }
+.sm-sticky-head thead th { position: sticky; top: 0; z-index: 2; }
+
+/* Боковое меню: мягкий цветной акцент вместо плоской белой панели. */
+.navbar-vertical .navbar-brand {
+  background: linear-gradient(135deg, var(--sm-accent-from), var(--sm-accent-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.navbar-vertical .nav-link.active,
+.navbar-vertical .nav-item.active > .nav-link {
+  background: color-mix(in srgb, var(--sm-accent-from) 9%, transparent);
+  border-radius: .375rem;
+  color: var(--sm-accent-from);
+}
+
+/* ---------- Печать ---------- */
+
+@media print {
+  .sm-grid { font-size: 10pt; min-width: 0; }
+  .sm-lesson { break-inside: avoid; }
+  .sm-lesson-tools { display: none; }
+  .page-wrapper { margin: 0; }
+  .page-header { background: none; }
+}

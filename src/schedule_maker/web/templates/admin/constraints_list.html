@@ -2,17 +2,19 @@
 {% import "partials/ui.html" as ui %}
 {% block title %}Ограничения · {{ app_name }}{% endblock %}
 {% block content %}
-{% call ui.page_header('Ограничения', 'Правила, по которым строится расписание. Каждое — отдельный плагин.', 'Правила') %}
+{% call ui.page_header(
+      'Правила расписания',
+      'Запреты нарушать нельзя, пожелания программа старается выполнить. Любое правило можно настроить под конкретного преподавателя, группу или дисциплину.') %}
   <a href="/admin/constraints/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить правило</a>
 {% endcall %}
 
 <div class="card mb-3">
-  <div class="card-header"><h3 class="card-title">Настроенные правила</h3></div>
+  <div class="card-header"><h3 class="card-title">Ваши правила</h3></div>
   {% if rows %}
   <div class="table-responsive">
     <table class="table table-vcenter card-table">
       <thead>
-        <tr><th>Правило</th><th>К кому</th><th>Параметры</th><th class="text-center">Вес</th><th class="w-1"></th></tr>
+        <tr><th>Правило</th><th>К кому применяется</th><th>Настройки</th><th>Насколько строго</th><th class="w-1"></th></tr>
       </thead>
       <tbody>
         {% for row in rows %}
@@ -20,17 +22,17 @@
           <td>
             <a href="/admin/constraints/{{ row.rule.id }}" class="text-reset">
               {{ row.plugin.title if row.plugin else row.rule.plugin_key }}</a>
-            {% if not row.plugin_enabled %}{{ ui.badge('плагин отключён', 'red') }}{% endif %}
+            {% if not row.plugin_enabled %}{{ ui.badge('дополнение отключено', 'red') }}{% endif %}
             {% if not row.rule.enabled %}{{ ui.badge('выключено', 'secondary') }}{% endif %}
-            {% if row.rule.note %}<div class="text-secondary small">{{ row.rule.note }}</div>{% endif %}
+            {% if row.rule.note %}<div class="small text-secondary">{{ row.rule.note }}</div>{% endif %}
           </td>
           <td>{{ row.scope_text }}</td>
-          <td class="sm-mono text-secondary">
+          <td class="sm-mono">
             {% for key, value in (row.rule.params or {}).items() %}{{ key }}={{ value }}{% if not loop.last %}, {% endif %}{% endfor %}
           </td>
-          <td class="text-center">
-            {% if row.rule.weight >= 100 %}{{ ui.badge('жёсткое', 'red') }}
-            {% else %}{{ ui.badge(row.rule.weight ~ '%', 'yellow', 'Мягкое правило: нарушается, если иначе не складывается') }}{% endif %}
+          <td>
+            <span class="badge {{ 'bg-danger text-white' if row.rule.weight >= 100 else 'bg-yellow-lt' }}"
+                  title="{{ strictness_hint(row.rule.weight) }}">{{ strictness_label(row.rule.weight) }}</span>
           </td>
           <td class="text-end">
             <a href="/admin/constraints/{{ row.rule.id }}" class="btn btn-sm btn-icon">{{ ui.icon('pencil') }}</a>
@@ -47,35 +49,40 @@
   </div>
   {% else %}
     <div class="card-body">
-      {{ ui.empty('Отдельных правил пока нет', 'Базовые проверки работают и без настройки — список ниже.') }}
+      {{ ui.empty('Своих правил пока нет',
+                  'Основные проверки — конфликты, вместимость, доступность — работают и без настройки. Их список ниже.') }}
     </div>
   {% endif %}
 </div>
 
 <div class="card">
-  <div class="card-header d-block">
-    <h3 class="card-title mb-0">Доступные типы правил</h3>
-    <div class="text-secondary small">
-      Каждый тип — плагин. Правила со значком «всегда» работают без настройки.
-    </div>
+  <div class="card-header">
+    <h3 class="card-title">Какие правила бывают</h3>
+  </div>
+  <div class="card-body border-bottom py-2">
+    <p class="mb-0">
+      Правила со значком «работает всегда» действуют сами по себе. Остальные
+      нужно настроить — указать, к кому они относятся и насколько строги.
+    </p>
   </div>
   <div class="table-responsive">
     <table class="table table-vcenter card-table">
       <thead>
-        <tr><th>Название</th><th>Что делает</th><th>К кому</th><th class="text-center">Настроено</th><th class="w-1"></th></tr>
+        <tr><th>Название</th><th>Что делает</th><th>К кому</th><th>Настроено</th><th class="w-1"></th></tr>
       </thead>
       <tbody>
         {% for row in catalogue %}
         <tr {% if not row.enabled %}class="opacity-50"{% endif %}>
           <td>
             {{ row.plugin.title }}
-            {% if row.always_on %}{{ ui.badge('всегда', 'green', 'Работает без отдельной настройки') }}{% endif %}
+            {% if row.always_on %}<span class="badge bg-green-lt" title="Действует само по себе">работает всегда</span>{% endif %}
             {% if not row.enabled %}{{ ui.badge('отключён', 'red') }}{% endif %}
-            <div class="sm-mono text-secondary">{{ row.plugin.key }}</div>
+            {% if user and user.is_admin %}<div class="sm-mono">{{ row.plugin.key }}</div>{% endif %}
           </td>
-          <td class="text-secondary">{{ row.plugin.description }}</td>
+          <td>{{ row.plugin.description }}</td>
           <td>{{ row.scope_label }}</td>
-          <td class="text-center">{{ row.instances or '—' }}</td>
+          <td>{% if row.instances %}{{ plural(row.instances, 'раз', 'раза', 'раз') }}{% else %}
+              <span class="text-secondary">—</span>{% endif %}</td>
           <td class="text-end">
             <a href="/admin/constraints/new?plugin_key={{ row.plugin.key }}" class="btn btn-sm">
               {{ ui.icon('plus') }} Настроить</a>

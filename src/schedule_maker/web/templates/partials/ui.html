@@ -5,6 +5,8 @@
      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-{{ name }}"/></svg>
 {%- endmacro %}
 
+{# Заголовок страницы. Подзаголовок идёт отдельной строкой под названием —
+   в Tabler в шапке карточки живёт только заголовок, и здесь так же. #}
 {% macro page_header(title, subtitle="", pretitle="") %}
 <div class="page-header d-print-none">
   <div class="container-xl">
@@ -12,10 +14,9 @@
       <div class="col-12 col-md">
         {% if pretitle %}<div class="page-pretitle">{{ pretitle }}</div>{% endif %}
         <h2 class="page-title">{{ title }}</h2>
-        {% if subtitle %}<div class="text-secondary mt-1">{{ subtitle }}</div>{% endif %}
+        {% if subtitle %}<div class="page-subtitle">{{ subtitle }}</div>{% endif %}
       </div>
-      {# На телефоне кнопки уходят под заголовок, иначе они наезжают на название. #}
-      <div class="col-12 col-md-auto ms-md-auto mt-2 mt-md-0 d-print-none">
+      <div class="col-12 col-md-auto ms-md-auto mt-3 mt-md-0 d-print-none">
         {{ caller() if caller is defined else "" }}
       </div>
     </div>
@@ -26,7 +27,7 @@
 {% macro empty(title, hint="") %}
 <div class="empty">
   <div class="empty-title">{{ title }}</div>
-  {% if hint %}<p class="empty-subtitle text-secondary">{{ hint }}</p>{% endif %}
+  {% if hint %}<p class="empty-subtitle">{{ hint }}</p>{% endif %}
 </div>
 {% endmacro %}
 
@@ -38,33 +39,81 @@
 <input type="hidden" name="csrf_token" value="{{ token }}">
 {%- endmacro %}
 
-{# Карточка пары. Единственное место, где рисуется занятие, — и в конструкторе,
-   и в публичном расписании, и в кабинете преподавателя. #}
-{% macro lesson_card(item, compact=False, draggable=False) %}
-<div class="sm-lesson bg-{{ item.color }}-lt border-start border-3 border-{{ item.color }}
-            {% if draggable %}sm-draggable{% endif %} {% if item.locked %}sm-locked{% endif %}"
-     data-assignment="{{ item.id }}" data-demand="{{ item.demand_id }}"
-     {% if item.conflict %}data-conflict="1"{% endif %}
-     title="{{ item.subject }} · {{ item.teacher }} · {{ item.room or 'без аудитории' }}">
-  <div class="sm-lesson-title">{{ item.subject_short or item.subject }}</div>
-  {% if not compact %}
-    <div class="sm-lesson-meta">{{ item.teacher }}</div>
-    <div class="sm-lesson-meta">
-      {% if item.room %}{{ item.room }}{% else %}<span class="text-azure">дистанционно</span>{% endif %}
-      {% if item.target %} · {{ item.target }}{% endif %}
+{# Подпись к полю формы: пояснение под ним, а не мелким серым в строку. #}
+{% macro hint(text) -%}
+{% if text %}<small class="form-hint">{{ text }}</small>{% endif %}
+{%- endmacro %}
+
+{# Карточка занятия. Единственное место, где рисуется пара, — и в сетке
+   конструктора, и в открытом расписании, и в кабинете преподавателя. #}
+{% macro lesson_card(item, draggable=False, show_target=True, full_title=False) %}
+<div class="sm-lesson sm-tone-{{ item.color }}
+            {% if draggable %}sm-draggable{% endif %}
+            {% if item.locked %}sm-locked{% endif %}
+            {% if item.conflict %}sm-conflict{% endif %}"
+     data-assignment="{{ item.id }}" data-demand="{{ item.demand_id }}" data-component="0"
+     title="{{ item.subject }} · {{ item.teacher }} · {{ item.room or 'дистанционно' }}">
+  <div class="sm-lesson-title">
+    {%- if full_title %}{{ item.subject }}{% else %}{{ item.subject_short or item.subject }}{% endif -%}
+  </div>
+  <div class="sm-lesson-teacher">{{ item.teacher|keep_together }}</div>
+  <div class="sm-lesson-place">
+    {% if item.room %}{{ item.room }}{% else %}дистанционно{% endif %}
+    {% if show_target and item.target %} · {{ item.target }}{% endif %}
+  </div>
+  {% set marks = [] %}
+  {% if item.type_short %}{% set _ = marks.append((item.type_short, 'neutral')) %}{% endif %}
+  {% if item.parity != 'any' %}
+    {% set _ = marks.append(('нечёт.' if item.parity == 'odd' else 'чёт.', 'week')) %}
+  {% endif %}
+  {% if item.online %}{% set _ = marks.append(('онлайн', 'online')) %}{% endif %}
+  {% if item.stream %}{% set _ = marks.append(('поток', 'stream')) %}{% endif %}
+  {% if item.locked %}{% set _ = marks.append(('закреплено', 'locked')) %}{% endif %}
+  {% if marks %}
+    <div class="sm-lesson-marks">
+      {% for text, tone in marks %}<span class="sm-mark sm-mark-{{ tone }}">{{ text }}</span>{% endfor %}
+      {% for extra in item.badges %}
+        <span class="sm-mark sm-mark-plugin" title="{{ extra.hint }}">{{ extra.text }}</span>
+      {% endfor %}
     </div>
   {% endif %}
-  <div class="sm-lesson-badges">
-    {% if item.type_short %}<span class="badge">{{ item.type_short }}</span>{% endif %}
-    {% if item.parity != 'any' %}
-      <span class="badge bg-yellow-lt">{{ 'нечёт' if item.parity == 'odd' else 'чёт' }}</span>
-    {% endif %}
-    {% if item.online %}<span class="badge bg-azure-lt">онлайн</span>{% endif %}
-    {% if item.stream %}<span class="badge bg-purple-lt">поток</span>{% endif %}
-    {% for extra in item.badges %}
-      <span class="badge bg-{{ extra.color }}-lt" title="{{ extra.hint }}">{{ extra.text }}</span>
-    {% endfor %}
-    {% if item.locked %}<span class="badge bg-dark-lt" title="Закреплено вручную">замок</span>{% endif %}
-  </div>
 </div>
+{% endmacro %}
+
+{# Занятие, которое ещё не стоит в сетке: его перетаскивают из боковой панели. #}
+{% macro pool_card(item) %}
+<div class="sm-lesson sm-tone-{{ item.color }} sm-draggable"
+     data-demand="{{ item.demand_id }}" data-component="{{ item.component }}"
+     title="{{ item.subject }} · {{ item.teacher }} · {{ item.target }}">
+  <div class="sm-lesson-title">{{ item.subject_short or item.subject }}</div>
+  <div class="sm-lesson-teacher">{{ item.target }}</div>
+  <div class="sm-lesson-place">{{ item.teacher|keep_together }}</div>
+  {% if item.parity != 'any' or item.online %}
+    <div class="sm-lesson-marks">
+      {% if item.parity != 'any' %}
+        <span class="sm-mark sm-mark-week">{{ 'нечёт.' if item.parity == 'odd' else 'чёт.' }}</span>
+      {% endif %}
+      {% if item.online %}<span class="sm-mark sm-mark-online">онлайн</span>{% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# Плитка с числом на дашборде: цветной значок делает страницу живее,
+   а число остаётся главным. #}
+{% macro stat_tile(title, value, url, icon_name, tone="primary", note="") %}
+<a href="{{ url }}" class="card card-sm sm-stat text-reset">
+  <div class="card-body">
+    <div class="row align-items-center">
+      <div class="col-auto">
+        <span class="sm-stat-icon sm-stat-icon-{{ tone }}">{{ icon(icon_name) }}</span>
+      </div>
+      <div class="col">
+        <div class="sm-stat-value">{{ value }}</div>
+        <div class="sm-stat-title">{{ title }}</div>
+        {% if note %}<div class="sm-stat-note">{{ note }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</a>
 {% endmacro %}

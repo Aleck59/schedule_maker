@@ -22,8 +22,14 @@ from schedule_maker.enums import (
     PARITY_LABELS,
     ROLE_LABELS,
     ROOM_KIND_LABELS,
+    STRICTNESS_LEVELS,
     STUDY_FORM_LABELS,
+    conflicts_phrase,
+    keep_together,
     plural,
+    remarks_phrase,
+    strictness_hint,
+    strictness_label,
 )
 from schedule_maker.plugins.registry import get_registry
 
@@ -53,7 +59,14 @@ def get_templates() -> Jinja2Templates:
             delivery_labels=DELIVERY_LABELS,
             role_labels=ROLE_LABELS,
             plural=plural,
+            conflicts_phrase=conflicts_phrase,
+            keep_together=keep_together,
+            remarks_phrase=remarks_phrase,
+            strictness_label=strictness_label,
+            strictness_hint=strictness_hint,
+            strictness_levels=STRICTNESS_LEVELS,
         )
+        templates.env.filters["keep_together"] = keep_together
         _templates = templates
     return _templates
 

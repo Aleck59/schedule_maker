@@ -64,7 +64,12 @@
           <span class="avatar avatar-sm">{{ (user.display_name or '?')[0] }}</span>
           <div class="d-none d-xl-block ps-2">
             <div>{{ user.display_name }}</div>
-            <div class="mt-1 small text-secondary">{{ role_labels[user.role] }}</div>
+            {# У учётки без ФИО имя совпадает с названием роли; повторять его
+               дважды незачем — полезнее показать логин. #}
+            <div class="mt-1 small text-secondary">
+              {% if user.display_name == role_labels[user.role] %}{{ user.login }}
+              {% else %}{{ role_labels[user.role] }}{% endif %}
+            </div>
           </div>
         </a>
         <div class="dropdown-menu dropdown-menu-end">
