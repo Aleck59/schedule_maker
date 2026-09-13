@@ -25,6 +25,7 @@ from schedule_maker.models import (
 )
 from schedule_maker.services.audit import log_action
 from schedule_maker.services.problem_builder import build_slot_grid
+from schedule_maker.services.sessions import current_session, demands_of
 from schedule_maker.web import forms
 from schedule_maker.web.crud import Filter, matches_search, normalize
 from schedule_maker.web.templating import render
@@ -80,7 +81,7 @@ def list_demands(
     course: forms.FilterId = None,
     q: forms.FilterText = "",
 ):
-    query = select(LessonDemand).order_by(LessonDemand.id)
+    query = demands_of(session).order_by(LessonDemand.id)
     if teacher:
         query = query.where(LessonDemand.teacher_id == teacher)
     demands = list(session.scalars(query))
@@ -237,7 +238,7 @@ async def save_demand(
     demand = session.get(LessonDemand, demand_id) if demand_id else None
     created = demand is None
     if demand is None:
-        demand = LessonDemand()
+        demand = LessonDemand(session_id=current_session(session).id)
         session.add(demand)
 
     target = forms.text(form, "target")

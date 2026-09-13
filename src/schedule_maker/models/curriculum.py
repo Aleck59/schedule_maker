@@ -35,6 +35,13 @@ class Curriculum(Base, TimestampMixin):
     #: у заочников и в коротких семестрах его меняют руками.
     weeks_per_semester: Mapped[int] = mapped_column(Integer, default=17)
 
+    #: Период, с которого план вступает в силу. Планы меняются приказами,
+    #: и старые группы доучиваются по своему: связь с периодом позволяет
+    #: держать оба сразу.
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("academic_session.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     source_name: Mapped[str] = mapped_column(String(255), default="")
     note: Mapped[str] = mapped_column(String(1000), default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

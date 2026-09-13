@@ -19,6 +19,7 @@ from schedule_maker.models.schedule import (
     GenerationRun,
     ScheduleVersion,
 )
+from schedule_maker.models.session import AcademicSession
 from schedule_maker.models.speciality import Speciality
 from schedule_maker.models.system import (
     AuditLog,
@@ -28,6 +29,7 @@ from schedule_maker.models.system import (
 )
 
 __all__ = [
+    "AcademicSession",
     "Assignment",
     "AuditLog",
     "Base",

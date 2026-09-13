@@ -34,6 +34,7 @@ from schedule_maker.models import (
     Teacher,
 )
 from schedule_maker.services.availability import resolve_availability
+from schedule_maker.services.sessions import demands_of
 
 DEFAULT_PAIR_MINUTES = 90
 DEFAULT_BREAK_MINUTES = 10
@@ -158,7 +159,9 @@ def build_problem(
             subgroup_count=max(1, group.subgroup_count if group.split_flag else 1),
         )
 
-    demands = session.scalars(select(LessonDemand).where(LessonDemand.is_active.is_(True)))
+    # Нагрузка берётся только из текущего учебного периода: иначе
+    # генератор попытался бы расставить осенние и весенние занятия разом.
+    demands = session.scalars(demands_of(session).where(LessonDemand.is_active.is_(True)))
     for demand in demands:
         info = _demand_info(demand, groups)
         if info is not None:

@@ -37,6 +37,13 @@ class ControlForm(StrEnum):
     COURSEWORK = "coursework"  # курсовая работа или проект
 
 
+class Term(StrEnum):
+    """Семестр внутри учебного года."""
+
+    AUTUMN = "autumn"  # осенний, он же первый
+    SPRING = "spring"  # весенний, он же второй
+
+
 class DisruptionKind(StrEnum):
     """Почему расписание пришлось менять."""
 
@@ -196,6 +203,15 @@ CONTROL_FORM_SHORT: dict[str, str] = {
     ControlForm.GRADED_CREDIT: "зач. с оц.",
     ControlForm.EXAM: "экз.",
     ControlForm.COURSEWORK: "курс.",
+}
+
+TERM_LABELS: dict[str, str] = {
+    Term.AUTUMN: "осенний семестр",
+    Term.SPRING: "весенний семестр",
+}
+TERM_SHORT: dict[str, str] = {
+    Term.AUTUMN: "осень",
+    Term.SPRING: "весна",
 }
 
 DISRUPTION_LABELS: dict[str, str] = {

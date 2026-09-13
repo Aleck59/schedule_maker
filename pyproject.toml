@@ -63,6 +63,15 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/schedule_maker"]
+# Миграции обязаны ехать вместе с кодом. Пока они лежали вне пакета,
+# установленная программа не умела обновлять схему и молча создавала
+# её заново — с недостающими колонками в старых таблицах.
+artifacts = [
+    "src/schedule_maker/migrations/**",
+    "src/schedule_maker/web/static/**",
+    "src/schedule_maker/web/templates/**",
+    "src/schedule_maker/plugins/builtin/*/templates/**",
+]
 
 [tool.ruff]
 line-length = 100
@@ -70,7 +79,7 @@ target-version = "py311"
 src = ["src", "tests"]
 # Файлы миграций генерируются автоматически, переформатировать их бессмысленно.
 # Примеры кода в документации выровнены по смыслу, а не по правилам форматтера.
-extend-exclude = ["alembic/versions", "*.md"]
+extend-exclude = ["src/schedule_maker/migrations/versions", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF"]

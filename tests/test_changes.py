@@ -13,8 +13,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from schedule_maker.enums import ChangeKind, DisruptionKind, WeekParity
+from schedule_maker.enums import ChangeKind, DisruptionKind, Term, WeekParity
 from schedule_maker.models import (
+    AcademicSession,
     Assignment,
     Disruption,
     LessonDemand,
@@ -53,20 +54,53 @@ def test_однодневная_помеха() -> None:
     assert service.dates_of(помеха) == [ПОНЕДЕЛЬНИК]
 
 
-def test_чётность_недели_переключается_настройкой() -> None:
-    """В одних учебных частях первая неделя нечётная, в других наоборот."""
-    прямо = service.parity_of(ПОНЕДЕЛЬНИК, first_week_is_odd=True)
-    наоборот = service.parity_of(ПОНЕДЕЛЬНИК, first_week_is_odd=False)
-    assert {прямо, наоборот} == {WeekParity.ODD, WeekParity.EVEN}
+def _период(starts_on: date = date(2026, 9, 1)) -> AcademicSession:
+    """Учебный период для проверок чётности."""
+    return AcademicSession(
+        year_start=2026,
+        term=Term.AUTUMN,
+        starts_on=starts_on,
+        ends_on=date(2026, 12, 31),
+        weeks=17,
+    )
+
+
+def test_первая_учебная_неделя_нечётная() -> None:
+    """Счёт идёт от начала семестра, а не от номера недели в году."""
+    период = _период(date(2026, 9, 1))
+    assert service.parity_of(date(2026, 9, 1), период) == WeekParity.ODD
+    assert service.parity_of(date(2026, 9, 5), период) == WeekParity.ODD
 
 
 def test_соседние_недели_разной_чётности() -> None:
-    следующая = ПОНЕДЕЛЬНИК + timedelta(days=7)
-    assert service.parity_of(ПОНЕДЕЛЬНИК) != service.parity_of(следующая)
+    период = _период()
+    assert service.parity_of(ПОНЕДЕЛЬНИК, период) != service.parity_of(
+        ПОНЕДЕЛЬНИК + timedelta(days=7), период
+    )
+
+
+def test_семестр_начавшийся_в_среду_не_теряет_первую_неделю() -> None:
+    """Неделя считается от понедельника, иначе ближайший понедельник
+    оказался бы уже второй неделей, хотя прошло два дня."""
+    период = _период(date(2026, 9, 2))  # среда
+    assert service.parity_of(date(2026, 9, 2), период) == WeekParity.ODD
+    assert service.parity_of(date(2026, 9, 4), период) == WeekParity.ODD, "та же неделя"
+    assert service.parity_of(date(2026, 9, 7), период) == WeekParity.EVEN, "следующая"
+
+
+def test_до_начала_семестра_чётности_нет() -> None:
+    период = _период(date(2026, 9, 1))
+    assert service.parity_of(date(2026, 8, 20), период) == WeekParity.ANY
+
+
+def test_без_периода_чётность_не_выдумывается() -> None:
+    """Лучше «подходит любой неделе», чем угаданная и неверная."""
+    assert service.parity_of(ПОНЕДЕЛЬНИК, None) == WeekParity.ANY
 
 
 def test_мигающая_пара_попадает_только_в_свою_неделю() -> None:
-    чётность = service.parity_of(ПОНЕДЕЛЬНИК)
+    период = _период()
+    чётность = service.parity_of(ПОНЕДЕЛЬНИК, период)
     своя = Assignment(day_of_week=0, slot_index=0, week_parity=чётность)
     чужая = Assignment(
         day_of_week=0,
@@ -75,9 +109,15 @@ def test_мигающая_пара_попадает_только_в_свою_н�
     )
     каждую = Assignment(day_of_week=0, slot_index=0, week_parity=WeekParity.ANY)
 
-    assert service.matches_parity(своя, ПОНЕДЕЛЬНИК)
-    assert not service.matches_parity(чужая, ПОНЕДЕЛЬНИК)
-    assert service.matches_parity(каждую, ПОНЕДЕЛЬНИК), "обычная пара идёт всегда"
+    assert service.matches_parity(своя, ПОНЕДЕЛЬНИК, период)
+    assert not service.matches_parity(чужая, ПОНЕДЕЛЬНИК, период)
+    assert service.matches_parity(каждую, ПОНЕДЕЛЬНИК, период), "обычная пара идёт всегда"
+
+
+def test_без_периода_не_отсеивается_ничего() -> None:
+    """Неизвестный период не должен молча выкидывать мигающие пары."""
+    чужая = Assignment(day_of_week=0, slot_index=0, week_parity=WeekParity.EVEN)
+    assert service.matches_parity(чужая, ПОНЕДЕЛЬНИК, None)
 
 
 # ---------------------------------------------------------------------------

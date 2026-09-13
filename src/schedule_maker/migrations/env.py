@@ -5,6 +5,7 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import create_engine, pool
 
 from schedule_maker.config import get_settings
 from schedule_maker.db import get_engine
@@ -17,9 +18,21 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def _database_url() -> str:
+    """Адрес базы: из настроек Alembic, если он задан, иначе из настроек программы.
+
+    Обычно правит настройка ``SM_DATABASE_URL`` — так работает ``sm db
+    upgrade``. Но вызывающий может указать базу явно, и тогда его выбор
+    должен побеждать: иначе миграцию нельзя ни проверить тестом, ни
+    применить к запасной копии.
+    """
+    explicit = config.get_main_option("sqlalchemy.url", None)
+    return explicit or get_settings().database_url
+
+
 def run_migrations_offline() -> None:
     context.configure(
-        url=get_settings().database_url,
+        url=_database_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         render_as_batch=True,
@@ -29,7 +42,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = get_engine()
+    url = _database_url()
+    connectable = (
+        get_engine()
+        if url == get_settings().database_url
+        else create_engine(url, poolclass=pool.NullPool)
+    )
     with connectable.connect() as connection:
         context.configure(
             connection=connection,

@@ -20,6 +20,7 @@ from schedule_maker.enums import ConstraintScope, RunStatus, VersionStatus, Week
 from schedule_maker.models.academic import LessonDemand
 from schedule_maker.models.base import Base, TimestampMixin
 from schedule_maker.models.org import Room
+from schedule_maker.models.session import AcademicSession
 
 
 class ScheduleVersion(Base, TimestampMixin):
@@ -29,6 +30,12 @@ class ScheduleVersion(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160))
+
+    #: Учебный период версии. Заменяет прежнее поле «семестр» строкой:
+    #: по строке нельзя было ни отобрать, ни сравнить.
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("academic_session.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     semester: Mapped[str] = mapped_column(String(60), default="")
     status: Mapped[str] = mapped_column(String(20), default=VersionStatus.DRAFT, index=True)
     parent_id: Mapped[int | None] = mapped_column(
@@ -39,6 +46,7 @@ class ScheduleVersion(Base, TimestampMixin):
     soft_score: Mapped[int] = mapped_column(Integer, default=0)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    session: Mapped[AcademicSession | None] = relationship(lazy="joined")
     assignments: Mapped[list[Assignment]] = relationship(
         back_populates="version", cascade="all, delete-orphan"
     )

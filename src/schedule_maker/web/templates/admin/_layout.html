@@ -91,6 +91,12 @@
 {% block header %}
 <header class="navbar navbar-expand-md d-print-none">
   <div class="container-xl">
+    {% if academic_session %}
+      <a href="/admin/sessions" class="btn btn-sm me-auto d-none d-md-inline-flex"
+         title="Учебный период, с которым сейчас работает программа">
+        {{ ui.icon('calendar-month') }} {{ academic_session.title }}
+      </a>
+    {% endif %}
     <div class="navbar-nav flex-row order-md-last ms-auto">
       <div class="nav-item me-3">
         <a href="/" class="nav-link px-2" title="Открытое расписание">
