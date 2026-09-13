@@ -29,7 +29,8 @@ class Field:
 
     name: str
     label: str
-    kind: str = "text"  # text | number | checkbox | select | textarea | color | time
+    #: text | number | checkbox | select | textarea | color | time | checks
+    kind: str = "text"
     required: bool = False
     help: str = ""
     options: Callable[[Session], Sequence[tuple[Any, str]]] | None = None
@@ -38,6 +39,8 @@ class Field:
     max: int | None = None
     in_list: bool = True
     formatter: Callable[[Any], str] | None = None
+    #: Для kind="checks" — модель на другом конце связи «многие ко многим».
+    relation: type | None = None
 
     def render_value(self, obj: Any) -> str:
         value = getattr(obj, self.name, "")
@@ -45,7 +48,15 @@ class Field:
             return self.formatter(value)
         if isinstance(value, time):
             return value.strftime("%H:%M")
+        if self.kind == "checks":
+            return ", ".join(sorted(str(row) for row in value or []))
         return "" if value is None else str(value)
+
+    def chosen_ids(self, obj: Any) -> set[int]:
+        """Отмеченные строки связи — набором id, чтобы шаблону было что сравнивать."""
+        if obj is None:
+            return set()
+        return {row.id for row in getattr(obj, self.name, None) or []}
 
 
 @dataclass(slots=True)
@@ -146,8 +157,29 @@ def matches_search(item: Any, fields: Sequence[str], query: str) -> bool:
 
 def _options(spec: CrudSpec, session: Session) -> dict[str, list[tuple[Any, str]]]:
     return {
-        f.name: list(f.options(session)) for f in spec.fields if f.kind == "select" and f.options
+        f.name: list(f.options(session))
+        for f in spec.fields
+        if f.kind in ("select", "checks") and f.options
     }
+
+
+def _read_checks(session: Session, form: Any, field_def: Field) -> list[Any]:
+    """Собрать отмеченные строки связи «многие ко многим».
+
+    Галочки приходят списком под одним именем, поэтому читаются через
+    ``multi_items``: обычный доступ по ключу вернул бы только последнюю.
+    """
+    model: Any = field_def.relation
+    if model is None:
+        return []
+    ids = {
+        int(value)
+        for key, value in form.multi_items()
+        if key == field_def.name and isinstance(value, str) and value.isdigit()
+    }
+    if not ids:
+        return []
+    return list(session.scalars(select(model).where(model.id.in_(ids))))
 
 
 def make_crud_router(spec: CrudSpec) -> APIRouter:
@@ -243,6 +275,9 @@ def make_crud_router(spec: CrudSpec) -> APIRouter:
 
         values: dict[str, Any] = {}
         for field_def in spec.fields:
+            if field_def.kind == "checks":
+                setattr(item, field_def.name, _read_checks(session, form, field_def))
+                continue
             value = _read(form, field_def)
             if field_def.required and value in (None, ""):
                 return render(

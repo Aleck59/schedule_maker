@@ -18,6 +18,7 @@ from schedule_maker.models import (
     Campus,
     LessonDemand,
     Room,
+    RoomFeature,
     Stream,
     StudentGroup,
     Subject,
@@ -205,6 +206,22 @@ def _current_target(demand: LessonDemand | None) -> str:
     return f"group:{demand.group_id}"
 
 
+def _chosen_features(session: Session, form) -> list[RoomFeature]:
+    """Отмеченные требования к аудитории.
+
+    Галочки приходят списком под одним именем, поэтому читаются через
+    ``multi_items``: обычный доступ по ключу вернул бы только последнюю.
+    """
+    ids = {
+        int(value)
+        for key, value in form.multi_items()
+        if key == "required_feature" and isinstance(value, str) and value.isdigit()
+    }
+    if not ids:
+        return []
+    return list(session.scalars(select(RoomFeature).where(RoomFeature.id.in_(ids))))
+
+
 def _form(request: Request, session: Session, demand: LessonDemand | None, error: str = ""):
     settings = get_settings()
     labels, _minutes = build_slot_grid(session, settings.days_per_week, settings.slots_per_day)
@@ -216,6 +233,11 @@ def _form(request: Request, session: Session, demand: LessonDemand | None, error
             "subjects": list(session.scalars(select(Subject).order_by(Subject.name))),
             "teachers": list(session.scalars(select(Teacher).order_by(Teacher.full_name))),
             "rooms": list(session.scalars(select(Room).order_by(Room.code))),
+            "room_features": list(
+                session.scalars(
+                    select(RoomFeature).where(RoomFeature.is_active).order_by(RoomFeature.name)
+                )
+            ),
             "targets": _targets(session),
             "current_target": _current_target(demand),
             "lesson_types": list(LessonType),
@@ -267,6 +289,7 @@ async def save_demand(
     demand.delivery_mode = forms.text(form, "delivery_mode", DeliveryMode.OFFLINE)
     demand.required_room_kind = forms.text(form, "required_room_kind", RoomKind.ANY)
     demand.required_room_id = forms.integer(form, "required_room_id")
+    demand.required_features = _chosen_features(session, form)
     demand.fixed_slot_index = forms.integer(form, "fixed_slot_index")
     demand.fixed_day_of_week = forms.integer(form, "fixed_day_of_week")
     demand.tags = forms.text(form, "tags")

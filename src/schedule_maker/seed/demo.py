@@ -43,6 +43,7 @@ from schedule_maker.models import (
     Faculty,
     LessonDemand,
     Room,
+    RoomFeature,
     ScheduleVersion,
     Stream,
     StreamMember,
@@ -145,6 +146,7 @@ def _seed_rooms(session: Session, mahachkala: Campus, kizlyar: Campus) -> dict[s
         (kizlyar, "К-12", "Аудитория К-12", RoomKind.SEMINAR, 28, ""),
         (kizlyar, "К-20", "Поточная аудитория", RoomKind.LECTURE_HALL, 50, "проектор"),
     ]
+    features: dict[str, RoomFeature] = {}
     rooms: dict[str, Room] = {}
     for campus, code, name, kind, capacity, equipment in data:
         room = Room(
@@ -153,8 +155,14 @@ def _seed_rooms(session: Session, mahachkala: Campus, kizlyar: Campus) -> dict[s
             name=name,
             kind=kind,
             capacity=capacity,
-            equipment=equipment,
         )
+        for title in [part.strip() for part in equipment.split(",") if part.strip()]:
+            feature = features.get(title)
+            if feature is None:
+                feature = RoomFeature(name=title)
+                session.add(feature)
+                features[title] = feature
+            room.features.append(feature)
         session.add(room)
         rooms[code] = room
     session.flush()

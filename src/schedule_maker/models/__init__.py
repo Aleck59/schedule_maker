@@ -11,7 +11,15 @@ from schedule_maker.models.base import Base
 from schedule_maker.models.changes import Disruption, ScheduleChange
 from schedule_maker.models.curriculum import Curriculum, CurriculumItem
 from schedule_maker.models.holidays import Holiday
-from schedule_maker.models.org import BellSlot, Campus, CampusTravel, Faculty, Room, Subject
+from schedule_maker.models.org import (
+    BellSlot,
+    Campus,
+    CampusTravel,
+    Faculty,
+    Room,
+    RoomFeature,
+    Subject,
+)
 from schedule_maker.models.people import Teacher, TeacherAvailability, TeacherRequest, User
 from schedule_maker.models.schedule import (
     Assignment,
@@ -48,6 +56,7 @@ __all__ = [
     "LessonDemand",
     "PluginState",
     "Room",
+    "RoomFeature",
     "ScheduleChange",
     "ScheduleVersion",
     "Speciality",

@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from datetime import time
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Time, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Time,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from schedule_maker.enums import RoomKind, StudyForm
@@ -43,6 +52,56 @@ class CampusTravel(Base):
     minutes: Mapped[int] = mapped_column(Integer, default=0)
 
 
+#: Связь «аудитория — признак». Много к многим: проектор есть в
+#: нескольких аудиториях, а в одной аудитории признаков несколько.
+room_feature = Table(
+    "room_feature",
+    Base.metadata,
+    Column("room_id", ForeignKey("room.id", ondelete="CASCADE"), primary_key=True),
+    Column("feature_id", ForeignKey("room_feature_kind.id", ondelete="CASCADE"), primary_key=True),
+)
+
+#: Связь «строка нагрузки — требуемый признак». Занятие, которому нужен
+#: проектор, не встанет в аудиторию без него.
+demand_feature = Table(
+    "demand_feature",
+    Base.metadata,
+    Column("demand_id", ForeignKey("lesson_demand.id", ondelete="CASCADE"), primary_key=True),
+    Column("feature_id", ForeignKey("room_feature_kind.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class RoomFeature(Base, TimestampMixin):
+    """Признак аудитории: проектор, компьютеры, лингафон.
+
+    Раньше это был текст через запятую в карточке аудитории. По такому
+    тексту нельзя ни искать, ни потребовать: «проектор», «Проектор» и
+    «проэктор» — три разных строки, и занятие, которому нужен проектор,
+    не могло об этом сказать. Отдельный справочник делает признак вещью,
+    на которую можно сослаться.
+    """
+
+    __tablename__ = "room_feature_kind"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    short: Mapped[str] = mapped_column(String(40), default="")
+    note: Mapped[str] = mapped_column(String(500), default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    rooms: Mapped[list[Room]] = relationship(secondary=room_feature, back_populates="features")
+
+    @property
+    def display(self) -> str:
+        return self.short or self.name
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __repr__(self) -> str:  # pragma: no cover - отладка
+        return f"<RoomFeature {self.name}>"
+
+
 class Room(Base, TimestampMixin):
     """Аудитория."""
 
@@ -55,10 +114,17 @@ class Room(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(160), default="")
     kind: Mapped[str] = mapped_column(String(30), default=RoomKind.SEMINAR)
     capacity: Mapped[int] = mapped_column(Integer, default=30)
-    equipment: Mapped[str] = mapped_column(String(255), default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     campus: Mapped[Campus] = relationship(back_populates="rooms")
+    features: Mapped[list[RoomFeature]] = relationship(
+        secondary=room_feature, back_populates="rooms", lazy="selectin"
+    )
+
+    @property
+    def feature_names(self) -> frozenset[str]:
+        """Признаки набором имён — в таком виде их сравнивают правила."""
+        return frozenset(feature.name for feature in self.features)
 
     @property
     def label(self) -> str:

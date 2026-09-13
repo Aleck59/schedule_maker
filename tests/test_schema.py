@@ -149,3 +149,65 @@ def test_схема_моделей_совпадает_с_миграциями(tm
 
     # И по колонкам тоже: пропущенный ALTER заметен только так.
     assert missing_columns(engine) == {}
+
+
+def test_перенос_оборудования_переживает_пересборку_таблицы(tmp_path) -> None:
+    """Текст «оборудование» должен стать строками справочника и не пропасть.
+
+    SQLite не умеет DROP COLUMN: alembic пересобирает таблицу через
+    временную копию, а `DROP TABLE room` по дороге уносит связи —
+    они висят на внешнем ключе с ON DELETE CASCADE. Один раз так и
+    вышло: справочник заполнился, а связи оказались пустыми.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    from schedule_maker.cli import MIGRATIONS_DIR
+
+    path = tmp_path / "rooms.db"
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{path}")
+    command.upgrade(config, "0006_academic_session")
+
+    engine = create_engine(f"sqlite:///{path}")
+    now = datetime.now().isoformat(sep=" ")
+    комнаты = [(1, "101", "проектор, компьютеры"), (2, "102", "Проектор"), (3, "201", "")]
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "insert into campus (id, name, slug, address, is_active, created_at, updated_at)"
+                " values (1,'Кизляр','kzl','',1,:now,:now)"
+            ),
+            {"now": now},
+        )
+        for номер, код, оборудование in комнаты:
+            conn.execute(
+                text(
+                    "insert into room (id, campus_id, code, name, kind, capacity, equipment,"
+                    " is_active, created_at, updated_at)"
+                    " values (:id,1,:code,'','seminar',30,:eq,1,:now,:now)"
+                ),
+                {"id": номер, "code": код, "eq": оборудование, "now": now},
+            )
+
+    command.upgrade(config, "head")
+
+    with engine.begin() as conn:
+        связи = conn.execute(
+            text(
+                "select room.code, kind.name from room_feature as link"
+                " join room on room.id = link.room_id"
+                " join room_feature_kind as kind on kind.id = link.feature_id"
+                " order by room.code, kind.name"
+            )
+        ).all()
+        названия = conn.execute(text("select name from room_feature_kind")).scalars().all()
+
+    assert [tuple(row) for row in связи] == [
+        ("101", "компьютеры"),
+        ("101", "проектор"),
+        ("102", "проектор"),
+    ]
+    # «Проектор» и «проектор» — один признак, а не два.
+    assert sorted(названия) == ["компьютеры", "проектор"]

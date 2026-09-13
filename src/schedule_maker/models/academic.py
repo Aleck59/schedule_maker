@@ -7,7 +7,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from schedule_maker.enums import DeliveryMode, LessonType, RoomKind, StudyForm, WeekParity
 from schedule_maker.models.base import Base, TimestampMixin
-from schedule_maker.models.org import Campus, Faculty, Room, Subject
+from schedule_maker.models.org import (
+    Campus,
+    Faculty,
+    Room,
+    RoomFeature,
+    Subject,
+    demand_feature,
+)
 from schedule_maker.models.people import Teacher
 from schedule_maker.models.session import AcademicSession
 from schedule_maker.models.speciality import Speciality
@@ -174,6 +181,12 @@ class LessonDemand(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     session: Mapped[AcademicSession | None] = relationship(lazy="joined")
+    #: Что должно быть в аудитории: проектор, компьютеры, лингафон.
+    #: Тип аудитории отвечает на вопрос «какая», признаки — «с чем».
+    required_features: Mapped[list[RoomFeature]] = relationship(
+        secondary=demand_feature, lazy="selectin"
+    )
+
     subject: Mapped[Subject] = relationship(lazy="joined")
     teacher: Mapped[Teacher] = relationship(lazy="joined")
     group: Mapped[StudentGroup | None] = relationship(lazy="joined")

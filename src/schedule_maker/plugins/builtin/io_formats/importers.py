@@ -13,7 +13,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from schedule_maker.enums import DeliveryMode, RoomKind, StudyForm
-from schedule_maker.models import Campus, Faculty, Room, StudentGroup, Subgroup, Subject, Teacher
+from schedule_maker.models import (
+    Campus,
+    Faculty,
+    Room,
+    RoomFeature,
+    StudentGroup,
+    Subgroup,
+    Subject,
+    Teacher,
+)
 from schedule_maker.plugins.api import ImporterPlugin, ImportResult, PluginManifest
 
 ROOM_KIND_BY_NAME = {
@@ -44,6 +53,29 @@ def _rows(raw: bytes) -> list[list[Any]]:
         for row in sheet.iter_rows(values_only=True)
         if any(value is not None for value in row)
     ]
+
+
+def _features(session: Session, text: str) -> list[RoomFeature]:
+    """Разобрать колонку «Оборудование» и подтянуть строки справочника.
+
+    Названия, которых в справочнике ещё нет, заводятся на месте: иначе
+    импорт молча терял бы половину колонки. Регистр не различается —
+    «Проектор» и «проектор» должны быть одной строкой, а не двумя.
+    """
+    names = [part.strip() for part in text.replace(";", ",").split(",") if part.strip()]
+    if not names:
+        return []
+    known = {feature.name.casefold(): feature for feature in session.scalars(select(RoomFeature))}
+    chosen: dict[int | str, RoomFeature] = {}
+    for name in names:
+        feature = known.get(name.casefold())
+        if feature is None:
+            feature = RoomFeature(name=name)
+            session.add(feature)
+            session.flush()
+            known[name.casefold()] = feature
+        chosen[feature.id] = feature
+    return list(chosen.values())
 
 
 def _text(value: Any) -> str:
@@ -209,7 +241,7 @@ class RoomImporter(ImporterPlugin):
                 _text(row[3]).lower() if len(row) > 3 else "", RoomKind.SEMINAR
             )
             room.capacity = int(row[4]) if len(row) > 4 and row[4] else 30
-            room.equipment = _text(row[5]) if len(row) > 5 else ""
+            room.features = _features(session, _text(row[5]) if len(row) > 5 else "")
             session.flush()
             if created:
                 result.created += 1

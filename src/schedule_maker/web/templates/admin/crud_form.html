@@ -33,6 +33,22 @@
                         {% if item and (item[f.name]|string) == (value|string) %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                   </select>
+                {% elif f.kind == 'checks' %}
+                  {% set chosen = f.chosen_ids(item) %}
+                  <div class="row g-2">
+                    {% for value, label in options.get(f.name, []) %}
+                      <div class="col-6 col-md-4">
+                        <label class="form-check">
+                          <input class="form-check-input" type="checkbox"
+                                 name="{{ f.name }}" value="{{ value }}"
+                                 {% if value in chosen %}checked{% endif %}>
+                          <span class="form-check-label">{{ label }}</span>
+                        </label>
+                      </div>
+                    {% else %}
+                      <div class="col-12 text-secondary">Справочник пуст.</div>
+                    {% endfor %}
+                  </div>
                 {% elif f.kind == 'textarea' %}
                   <textarea class="form-control" id="fld-{{ f.name }}" name="{{ f.name }}" rows="3"
                             {% if f.required %}required{% endif %}>{{ f.render_value(item) if item else '' }}</textarea>

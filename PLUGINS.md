@@ -297,6 +297,7 @@ def test_поздняя_пятница():
 
 **Жёсткие по умолчанию.** `core.teacher_conflict` · `core.group_conflict` ·
 `core.room_conflict` · `core.room_capacity` · `core.room_kind` ·
+`core.room_features` ·
 `core.campus_match` · `core.campus_travel` · `core.teacher_availability` ·
 `core.external_busy` · `core.fixed_time_slot` · `core.teacher_workload` ·
 `core.teacher_max_daily` · `core.group_max_daily` · `core.max_per_day_subject` ·
