@@ -15,7 +15,14 @@ from sqlalchemy.orm import Session
 
 from schedule_maker.config import get_settings
 from schedule_maker.enums import ChangeKind, DisruptionKind, WeekParity
-from schedule_maker.models import Assignment, Disruption, ScheduleChange
+from schedule_maker.models import Assignment, Disruption, ScheduleChange, Teacher
+from schedule_maker.services.availability import (
+    MAX_WEEKS_IN_MONTH,
+    is_last_week_of_month,
+    visiting_weeks,
+    visiting_weeks_phrase,
+    week_of_month,
+)
 
 
 def parity_of(day: date, first_week_is_odd: bool = True) -> str:
@@ -287,3 +294,124 @@ def drop_change(session: Session, assignment_id: int, on_date: date) -> bool:
     session.delete(change)
     session.flush()
     return True
+
+
+# ---------------------------------------------------------------------------
+# График приездов
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class VisitPlan:
+    """Что произойдёт, если развернуть график приездов преподавателя."""
+
+    teacher_id: int
+    teacher_name: str
+    weeks: list[int]
+    absent_dates: list[date] = field(default_factory=list)
+    lessons: int = 0
+
+    @property
+    def empty(self) -> bool:
+        return self.lessons == 0
+
+
+def visit_gaps(
+    session: Session,
+    teacher: Teacher,
+    version_id: int,
+    *,
+    since: date,
+    until: date,
+) -> VisitPlan:
+    """Занятия, которые не состоятся: преподавателя в эти недели нет.
+
+    Недельная сетка не умеет «первую неделю месяца»: пара в ней стоит
+    каждую неделю. Настоящий график приездов живёт в календаре, поэтому
+    недостающие недели разворачиваются в обычные отмены на даты.
+    """
+    weeks = visiting_weeks(teacher.availability)
+    plan = VisitPlan(teacher_id=teacher.id, teacher_name=teacher.short_name, weeks=weeks)
+    if not weeks:
+        return plan  # приезжает каждую неделю — снимать нечего
+
+    settings = get_settings()
+    first_week_is_odd = getattr(settings, "first_week_is_odd", True)
+    assignments = [
+        a
+        for a in session.scalars(select(Assignment).where(Assignment.version_id == version_id))
+        if a.demand.teacher_id == teacher.id
+    ]
+    if not assignments:
+        return plan
+
+    day = since
+    while day <= until:
+        if day.weekday() < settings.days_per_week and not _teacher_present(weeks, day):
+            plan.absent_dates.append(day)
+            plan.lessons += sum(
+                1
+                for a in assignments
+                if a.day_of_week == day.weekday() and matches_parity(a, day, first_week_is_odd)
+            )
+        day += timedelta(days=1)
+    return plan
+
+
+def _teacher_present(weeks: list[int], day: date) -> bool:
+    """Приезжает ли преподаватель на этой неделе месяца."""
+    if MAX_WEEKS_IN_MONTH in weeks and is_last_week_of_month(day):
+        return True
+    return week_of_month(day) in weeks
+
+
+def apply_visit_gaps(
+    session: Session,
+    teacher: Teacher,
+    version_id: int,
+    *,
+    since: date,
+    until: date,
+) -> tuple[Disruption, int]:
+    """Записать отмены по графику приездов одной помехой.
+
+    Всё сводится под одну причину: так эти отмены потом видно вместе и
+    можно снять одним удалением, если график изменился.
+    """
+    plan = visit_gaps(session, teacher, version_id, since=since, until=until)
+    disruption = Disruption(
+        kind=DisruptionKind.TRIP,
+        title=f"{teacher.short_name}: приезжает {visiting_weeks_phrase(plan.weeks)}",
+        date_from=since,
+        date_to=until,
+        teacher_id=teacher.id,
+        note="Создано по графику приездов из карточки преподавателя.",
+    )
+    session.add(disruption)
+    session.flush()
+
+    settings = get_settings()
+    first_week_is_odd = getattr(settings, "first_week_is_odd", True)
+    assignments = [
+        a
+        for a in session.scalars(select(Assignment).where(Assignment.version_id == version_id))
+        if a.demand.teacher_id == teacher.id
+    ]
+    created = 0
+    for day in plan.absent_dates:
+        for assignment in assignments:
+            if assignment.day_of_week != day.weekday():
+                continue
+            if not matches_parity(assignment, day, first_week_is_odd):
+                continue
+            apply_change(
+                session,
+                assignment=assignment,
+                on_date=day,
+                kind=ChangeKind.CANCEL,
+                disruption=disruption,
+                note=f"{teacher.short_name} приезжает {visiting_weeks_phrase(plan.weeks)}",
+            )
+            created += 1
+    session.flush()
+    return disruption, created

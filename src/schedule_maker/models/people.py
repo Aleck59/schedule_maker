@@ -92,11 +92,30 @@ class TeacherAvailability(Base):
     day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     slot_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     week_parity: Mapped[str] = mapped_column(String(10), default=WeekParity.ANY)
+
+    #: Недели месяца, в которые правило действует: «1,3» — первая и третья.
+    #: Пусто — каждую неделю. Это не то же самое, что чётность: вахтовик,
+    #: приезжающий в первую неделю месяца, попадает то на чётную неделю
+    #: года, то на нечётную, и парой чёт/нечет его график не описать.
+    weeks_of_month: Mapped[str] = mapped_column(String(20), default="")
+
     date_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     date_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     reason: Mapped[str] = mapped_column(String(255), default="")
 
     teacher: Mapped[Teacher] = relationship(back_populates="availability")
+
+    @property
+    def week_numbers(self) -> list[int]:
+        """Недели месяца списком чисел. Пустой список — правило на все недели."""
+        return sorted(
+            {int(part) for part in self.weeks_of_month.split(",") if part.strip().isdigit()}
+        )
+
+    def covers_week(self, week_of_month: int) -> bool:
+        """Действует ли правило на эту неделю месяца."""
+        weeks = self.week_numbers
+        return not weeks or week_of_month in weeks
 
 
 class User(Base, TimestampMixin):

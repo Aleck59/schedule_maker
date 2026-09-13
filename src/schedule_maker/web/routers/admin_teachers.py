@@ -14,7 +14,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from schedule_maker.config import get_settings
 from schedule_maker.deps import db_session, require_staff, verify_csrf
-from schedule_maker.enums import DELIVERY_LABELS, AvailabilityKind, DeliveryMode
+from schedule_maker.enums import (
+    DELIVERY_LABELS,
+    PARITY_LABELS,
+    AvailabilityKind,
+    DeliveryMode,
+    WeekParity,
+)
 from schedule_maker.models import (
     Campus,
     ExternalBusy,
@@ -24,7 +30,13 @@ from schedule_maker.models import (
     TeacherAvailability,
 )
 from schedule_maker.services.audit import log_action
-from schedule_maker.services.availability import resolve_availability
+from schedule_maker.services.availability import (
+    MAX_WEEKS_IN_MONTH,
+    WEEK_OF_MONTH_LABELS,
+    resolve_availability,
+    visiting_weeks,
+    visiting_weeks_phrase,
+)
 from schedule_maker.services.problem_builder import build_slot_grid
 from schedule_maker.web import forms
 from schedule_maker.web.crud import Filter, matches_search
@@ -140,8 +152,14 @@ def _form(request: Request, session: Session, teacher: Teacher | None, error: st
     allowed: frozenset[tuple[int, int]] = frozenset()
     restricted = False
     busy: set[tuple[int, int]] = set()
+    weeks: list[int] = []
+    parity = WeekParity.ANY
     if teacher is not None:
         allowed, restricted = resolve_availability(teacher.availability, days, slots)
+        weeks = visiting_weeks(teacher.availability)
+        parities = {row.week_parity for row in teacher.availability}
+        if len(parities) == 1:
+            parity = WeekParity(parities.pop())
         busy = {
             (row.day_of_week, row.slot_index)
             for row in session.scalars(
@@ -163,6 +181,12 @@ def _form(request: Request, session: Session, teacher: Teacher | None, error: st
             "campuses": list(session.scalars(select(Campus).order_by(Campus.name))),
             "sources": list(session.scalars(select(ExternalSource).order_by(ExternalSource.name))),
             "delivery_modes": list(DeliveryMode),
+            "weeks_of_month": weeks,
+            "week_labels": WEEK_OF_MONTH_LABELS,
+            "week_numbers": list(range(1, MAX_WEEKS_IN_MONTH + 1)),
+            "weeks_phrase": visiting_weeks_phrase(weeks),
+            "availability_parity": parity,
+            "parity_labels": PARITY_LABELS,
             "error": error,
         },
     )
@@ -233,12 +257,20 @@ def _save_availability(session: Session, teacher: Teacher, form) -> None:
         if forms.flag(form, f"av-{day}-{index}")
     }
     reason = forms.text(form, "availability_reason")
+    # Недели месяца пишутся в каждую строку доступности: правило действует
+    # на выбранных слотах и только в эти недели.
+    weeks = ",".join(
+        str(week) for week in range(1, MAX_WEEKS_IN_MONTH + 1) if forms.flag(form, f"week-{week}")
+    )
+    parity = forms.text(form, "availability_parity") or WeekParity.ANY
+    if parity not in set(WeekParity):
+        parity = WeekParity.ANY
 
     for row in list(teacher.availability):
         session.delete(row)
     session.flush()
 
-    if len(checked) == days * slots:
+    if len(checked) == days * slots and not weeks and parity == WeekParity.ANY:
         return  # свободен всегда — правила не нужны
 
     for day in range(days):
@@ -251,6 +283,8 @@ def _save_availability(session: Session, teacher: Teacher, form) -> None:
                     teacher_id=teacher.id,
                     kind=AvailabilityKind.ALLOW,
                     day_of_week=day,
+                    week_parity=parity,
+                    weeks_of_month=weeks,
                     reason=reason,
                 )
             )
@@ -262,6 +296,8 @@ def _save_availability(session: Session, teacher: Teacher, form) -> None:
                     kind=AvailabilityKind.ALLOW,
                     day_of_week=day,
                     slot_index=index,
+                    week_parity=parity,
+                    weeks_of_month=weeks,
                     reason=reason,
                 )
             )

@@ -22,6 +22,7 @@ from schedule_maker.models import (
 )
 from schedule_maker.plugins.builtin.emergency import service
 from schedule_maker.services.audit import log_action
+from schedule_maker.services.availability import visiting_weeks_phrase
 from schedule_maker.services.versions import published_version, working_version
 from schedule_maker.web import forms
 from schedule_maker.web.templating import render
@@ -237,6 +238,85 @@ async def apply(
     if dropped:
         note += f", снято: {dropped}"
     return _back(f"/admin/changes/{disruption_id}", message=note)
+
+
+@router.get("/visits/{teacher_id}", include_in_schema=False)
+def visits_page(
+    teacher_id: int,
+    request: Request,
+    session: Session = Depends(db_session),
+    user=Depends(require_staff),
+    since: str = "",
+    until: str = "",
+):
+    """Что снимется с расписания, если развернуть график приездов."""
+    teacher = session.get(Teacher, teacher_id)
+    if teacher is None:
+        return _back("/admin/teachers", error="Преподаватель не найден")
+    start, end = _period(since, until)
+    plan = service.visit_gaps(session, teacher, _live_version(session), since=start, until=end)
+    return render(
+        request,
+        "emergency/visits.html",
+        {
+            "teacher": teacher,
+            "plan": plan,
+            "since": start,
+            "until": end,
+            "weeks_phrase": visiting_weeks_phrase(plan.weeks),
+        },
+    )
+
+
+@router.post("/visits/{teacher_id}", include_in_schema=False)
+def apply_visits(
+    teacher_id: int,
+    session: Session = Depends(db_session),
+    user=Depends(require_staff),
+    since: str = Form(""),
+    until: str = Form(""),
+    _csrf: None = Depends(verify_csrf),
+):
+    teacher = session.get(Teacher, teacher_id)
+    if teacher is None:
+        return _back("/admin/teachers", error="Преподаватель не найден")
+    start, end = _period(since, until)
+    disruption, created = service.apply_visit_gaps(
+        session, teacher, _live_version(session), since=start, until=end
+    )
+    log_action(
+        session,
+        user,
+        action="changes.visits",
+        entity="teacher",
+        entity_id=teacher.id,
+        detail=f"снято занятий: {created}",
+    )
+    session.commit()
+    if created == 0:
+        session.delete(disruption)
+        session.commit()
+        return _back(
+            f"/admin/changes/visits/{teacher_id}",
+            error="Снимать нечего: в этот период занятий нет",
+        )
+    return _back(
+        f"/admin/changes/{disruption.id}",
+        message=f"Снято занятий: {created}",
+    )
+
+
+def _period(since: str, until: str) -> tuple[date, date]:
+    """Период по умолчанию — ближайшие четыре месяца, то есть семестр."""
+    try:
+        start = datetime.strptime(since, "%Y-%m-%d").date() if since else date.today()
+    except ValueError:
+        start = date.today()
+    try:
+        end = datetime.strptime(until, "%Y-%m-%d").date() if until else start + timedelta(days=120)
+    except ValueError:
+        end = start + timedelta(days=120)
+    return start, max(start, end)
 
 
 @router.post("/{disruption_id}/delete", include_in_schema=False)
