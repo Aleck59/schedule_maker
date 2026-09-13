@@ -1,6 +1,32 @@
 {% extends "base.html" %}
 {% import "partials/ui.html" as ui %}
 
+{# Раскрывающаяся группа в боковом меню. Открыта, если текущая страница
+   внутри неё: иначе после перехода в справочник меню схлопнется и станет
+   непонятно, где ты находишься. #}
+{% macro nav_group(title, icon_name, items) %}
+  {% set ns = namespace(here=false) %}
+  {% for url, _label, _icon in items %}
+    {% if request.url.path.startswith(url) %}{% set ns.here = true %}{% endif %}
+  {% endfor %}
+  <li class="nav-item dropdown {% if ns.here %}active{% endif %}">
+    <a class="nav-link dropdown-toggle" href="#navbar-more" data-bs-toggle="dropdown"
+       role="button" aria-expanded="{{ 'true' if ns.here else 'false' }}">
+      <span class="nav-link-icon d-md-none d-lg-inline-block">{{ ui.icon(icon_name) }}</span>
+      <span class="nav-link-title">{{ title }}</span>
+    </a>
+    <div class="dropdown-menu {% if ns.here %}show{% endif %}">
+      {% for url, label, item_icon in items %}
+        <a class="dropdown-item {% if request.url.path.startswith(url) %}active{% endif %}"
+           href="{{ url }}">
+          <span class="nav-link-icon d-md-none d-lg-inline-block me-1">{{ ui.icon(item_icon) }}</span>
+          {{ label }}
+        </a>
+      {% endfor %}
+    </div>
+  </li>
+{% endmacro %}
+
 {% macro nav_link(url, title, icon_name) %}
   <li class="nav-item {% if request.url.path.startswith(url) %}active{% endif %}">
     <a class="nav-link" href="{{ url }}">
@@ -29,11 +55,20 @@
         {{ nav_link('/admin/dashboard', 'Дашборд', 'home') }}
         {{ nav_link('/admin/builder', 'Конструктор', 'layout-grid') }}
         {{ nav_link('/admin/diagnostics', 'Диагностика', 'alert-triangle') }}
-        {{ nav_link('/admin/demands', 'Нагрузка', 'clipboard-list') }}
-        {{ nav_link('/admin/teachers', 'Преподаватели', 'users') }}
-        {{ nav_link('/admin/groups', 'Группы', 'school') }}
-        {{ nav_link('/admin/rooms', 'Аудитории', 'building-community') }}
-        {{ nav_link('/admin/subjects', 'Дисциплины', 'book') }}
+        {# Справочники нужны редко: их заполняют в начале семестра и потом
+           почти не открывают. В боковом меню они занимали половину высоты
+           и отодвигали вниз то, чем пользуются каждый день. #}
+        {% set reference = [
+          ('/admin/demands', 'Нагрузка', 'clipboard-list'),
+          ('/admin/teachers', 'Преподаватели', 'users'),
+          ('/admin/groups', 'Группы', 'school'),
+          ('/admin/rooms', 'Аудитории', 'building-community'),
+          ('/admin/subjects', 'Дисциплины', 'book'),
+          ('/admin/faculties', 'Направления', 'school'),
+          ('/admin/campuses', 'Филиалы', 'map-pin'),
+          ('/admin/bells', 'Сетка звонков', 'clock'),
+        ] %}
+        {{ nav_group('Прочее', 'dots', reference) }}
         {{ nav_link('/admin/constraints', 'Ограничения', 'shield-lock') }}
         {{ nav_link('/admin/versions', 'Версии', 'calendar-month') }}
         {{ nav_link('/admin/io', 'Импорт и экспорт', 'file-export') }}
@@ -53,7 +88,7 @@
 {% block header %}
 <header class="navbar navbar-expand-md d-print-none">
   <div class="container-xl">
-    <div class="navbar-nav flex-row order-md-last">
+    <div class="navbar-nav flex-row order-md-last ms-auto">
       <div class="nav-item me-3">
         <a href="/" class="nav-link px-2" title="Открытое расписание">
           {{ ui.icon('world') }} <span class="d-none d-md-inline ms-1">Публичный вид</span>

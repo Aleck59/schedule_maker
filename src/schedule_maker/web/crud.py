@@ -7,14 +7,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from schedule_maker.deps import db_session, require_staff, verify_csrf
@@ -49,6 +49,22 @@ class Field:
 
 
 @dataclass(slots=True)
+class Filter:
+    """Быстрый отбор над списком справочника.
+
+    Когда филиалов два, а аудиторий полторы сотни, полный список
+    бесполезен: нужную строку в нём ищут глазами. Фильтр сужает список
+    одним щелчком, а поиск — по слову из названия.
+    """
+
+    name: str
+    label: str
+    column: str
+    options: Callable[[Session], Iterable[tuple[Any, str]]]
+    all_label: str = "— все —"
+
+
+@dataclass(slots=True)
 class CrudSpec:
     """Описание справочника целиком."""
 
@@ -67,6 +83,13 @@ class CrudSpec:
     # Вызывается ПОСЛЕ записи, когда у записи уже есть id.
     after_save: Callable[[Session, Any, dict[str, Any]], None] | None = None
     extra_context: Callable[[Session], dict[str, Any]] | None = field(default=None)
+
+    #: Колонки, по которым ищет строка поиска. Пусто — поиска нет.
+    search_fields: list[str] = field(default_factory=list)
+    #: Быстрые отборы над списком.
+    filters: list[Filter] = field(default_factory=list)
+    #: Подсказка в поле поиска: человеку понятнее, что туда вводить.
+    search_hint: str = "Поиск по названию"
 
     @property
     def list_fields(self) -> list[Field]:
@@ -94,6 +117,33 @@ def _read(form: Any, field_def: Field) -> Any:
     return raw
 
 
+def normalize(text: str) -> str:
+    """Привести строку к виду, в котором её сравнивают при поиске.
+
+    Приводится к нижнему регистру и убирается «ё»: искать «Королев» и
+    находить «Королёв» — ровно то, чего человек ждёт.
+    """
+    return text.casefold().replace("ё", "е")
+
+
+def matches_search(item: Any, fields: Sequence[str], query: str) -> bool:
+    """Есть ли искомое слово в одном из полей записи.
+
+    Поиск идёт в Python, а не в SQL, нарочно. SQLite сравнивает без учёта
+    регистра только латиницу: `LOWER('БИО')` вернёт «БИО», и запрос «био»
+    не найдёт ничего. Справочники тут небольшие — сотни строк, — так что
+    правильный ответ дороже лишнего запроса.
+    """
+    needle = normalize(query)
+    for name in fields:
+        value = getattr(item, name, None)
+        if value is None:
+            continue
+        if needle in normalize(str(value)):
+            return True
+    return False
+
+
 def _options(spec: CrudSpec, session: Session) -> dict[str, list[tuple[Any, str]]]:
     return {
         f.name: list(f.options(session)) for f in spec.fields if f.kind == "select" and f.options
@@ -109,13 +159,33 @@ def make_crud_router(spec: CrudSpec) -> APIRouter:
         request: Request,
         session: Session = Depends(db_session),
         user=Depends(require_staff),
+        q: forms.FilterText = "",
     ):
         order_column = getattr(spec.model, spec.order_by)
-        items: list[Any] = list(session.scalars(select(spec.model).order_by(order_column)))
+        query: Select[Any] = select(spec.model).order_by(order_column)
+
+        # Отборы по колонкам идут в запрос: это точное сравнение, база
+        # справляется с ним лучше и быстрее.
+        chosen: dict[str, int | None] = {}
+        for rule in spec.filters:
+            value = forms.integer(request.query_params, rule.name)
+            chosen[rule.name] = value
+            if value is not None:
+                query = query.where(getattr(spec.model, rule.column) == value)
+
+        items: list[Any] = list(session.scalars(query))
+        total = len(items)
+        if q and spec.search_fields:
+            items = [item for item in items if matches_search(item, spec.search_fields, q)]
+
         options = _options(spec, session)
         context = {
             "spec": spec,
             "items": items,
+            "total": total,
+            "query": q,
+            "chosen": chosen,
+            "filter_options": {rule.name: list(rule.options(session)) for rule in spec.filters},
             "options": options,
             # Подписи для колонок-ссылок: в таблице показываем название, а не id.
             "options_labels": {

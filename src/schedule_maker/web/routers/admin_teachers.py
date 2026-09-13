@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from schedule_maker.config import get_settings
 from schedule_maker.deps import db_session, require_staff, verify_csrf
-from schedule_maker.enums import AvailabilityKind, DeliveryMode
+from schedule_maker.enums import DELIVERY_LABELS, AvailabilityKind, DeliveryMode
 from schedule_maker.models import (
     Campus,
     ExternalBusy,
@@ -27,22 +27,52 @@ from schedule_maker.services.audit import log_action
 from schedule_maker.services.availability import resolve_availability
 from schedule_maker.services.problem_builder import build_slot_grid
 from schedule_maker.web import forms
+from schedule_maker.web.crud import Filter, matches_search
 from schedule_maker.web.routers.admin_catalog import _slugify
 from schedule_maker.web.templating import render
 
 router = APIRouter(prefix="/admin/teachers", tags=["Преподаватели"])
 
 
+#: Отборы над списком преподавателей. Кафедра сюда не попала нарочно:
+#: в справочнике она свободным текстом, и выпадающий список из неё
+#: собрался бы с опечатками. Кафедру ищут строкой поиска.
+FILTERS = [
+    Filter(
+        "campus",
+        "Основной филиал",
+        "base_campus_id",
+        lambda s: [(c.id, c.name) for c in s.scalars(select(Campus).order_by(Campus.name))],
+    ),
+    Filter(
+        "delivery",
+        "Формат",
+        "delivery_mode",
+        lambda _s: list(DELIVERY_LABELS.items()),
+        all_label="— любой —",
+    ),
+]
+
+
 @router.get("", include_in_schema=False)
 def list_teachers(
-    request: Request, session: Session = Depends(db_session), user=Depends(require_staff)
+    request: Request,
+    session: Session = Depends(db_session),
+    user=Depends(require_staff),
+    q: forms.FilterText = "",
+    campus: forms.FilterId = None,
+    delivery: forms.FilterText = "",
 ):
     settings = get_settings()
-    teachers = list(
-        session.scalars(
-            select(Teacher).options(selectinload(Teacher.availability)).order_by(Teacher.full_name)
-        )
-    )
+    query = select(Teacher).options(selectinload(Teacher.availability)).order_by(Teacher.full_name)
+    if campus:
+        query = query.where(Teacher.base_campus_id == campus)
+    if delivery:
+        query = query.where(Teacher.delivery_mode == delivery)
+    teachers = list(session.scalars(query))
+    total = len(teachers)
+    if q:
+        teachers = [t for t in teachers if matches_search(t, ["full_name", "department"], q)]
     # Суммируем нагрузку: строк нагрузки на преподавателя может быть несколько.
     totals: dict[int, int] = {}
     for teacher_id, pairs in session.execute(
@@ -66,7 +96,18 @@ def list_teachers(
                 "days": sorted({day for day, _ in allowed}),
             }
         )
-    return render(request, "admin/teachers_list.html", {"rows": rows})
+    return render(
+        request,
+        "admin/teachers_list.html",
+        {
+            "rows": rows,
+            "total": total,
+            "query": q,
+            "filters": FILTERS,
+            "chosen": {"campus": campus, "delivery": delivery},
+            "filter_options": {rule.name: list(rule.options(session)) for rule in FILTERS},
+        },
+    )
 
 
 @router.get("/new", include_in_schema=False)

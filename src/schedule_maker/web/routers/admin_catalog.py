@@ -22,7 +22,7 @@ from schedule_maker.models import (
     Subgroup,
     Subject,
 )
-from schedule_maker.web.crud import CrudSpec, Field, make_crud_router
+from schedule_maker.web.crud import CrudSpec, Field, Filter, make_crud_router
 
 router = APIRouter()
 
@@ -33,6 +33,12 @@ def _campus_options(session: Session) -> list[tuple[int, str]]:
 
 def _faculty_options(session: Session) -> list[tuple[int, str]]:
     return [(f.id, f.name) for f in session.scalars(select(Faculty).order_by(Faculty.name))]
+
+
+def _course_options(session: Session) -> list[tuple[int, str]]:
+    """Курсы, которые действительно есть в справочнике групп."""
+    courses = sorted(set(session.scalars(select(StudentGroup.course))))
+    return [(course, f"{course} курс") for course in courses]
 
 
 def _enum_options(labels: dict[str, str]):
@@ -156,6 +162,12 @@ ROOM = CrudSpec(
     model=Room,
     order_by="code",
     icon="building-community",
+    search_fields=["code", "name", "equipment"],
+    search_hint="Номер, название или оборудование",
+    filters=[
+        Filter("campus", "Филиал", "campus_id", _campus_options),
+        Filter("kind", "Тип", "kind", _enum_options(ROOM_KIND_LABELS), all_label="— любой —"),
+    ],
     fields=[
         Field("code", "Номер", required=True),
         Field("name", "Название"),
@@ -182,6 +194,7 @@ FACULTY = CrudSpec(
     model=Faculty,
     order_by="name",
     icon="school",
+    search_fields=["name", "short"],
     fields=[
         Field("name", "Название", required=True),
         Field("short", "Сокращение", help="Например: ЮР"),
@@ -197,6 +210,7 @@ SUBJECT = CrudSpec(
     model=Subject,
     order_by="name",
     icon="book",
+    search_fields=["name", "short"],
     fields=[
         Field("name", "Название", required=True),
         Field("short", "Сокращение", help="Показывается на карточке пары"),
@@ -238,6 +252,13 @@ GROUP = CrudSpec(
     icon="users",
     prepare=_ensure_slug,
     after_save=_sync_subgroups,
+    search_fields=["name"],
+    search_hint="Название группы",
+    filters=[
+        Filter("campus", "Филиал", "campus_id", _campus_options),
+        Filter("faculty", "Направление", "faculty_id", _faculty_options),
+        Filter("course", "Курс", "course", _course_options),
+    ],
     fields=[
         Field("name", "Название", required=True, help="Например: БИО-101"),
         Field("course", "Курс", kind="number", required=True, min=1, max=6),
@@ -278,6 +299,16 @@ BELL = CrudSpec(
     model=BellSlot,
     order_by="slot_index",
     icon="clock",
+    filters=[
+        Filter("campus", "Филиал", "campus_id", _campus_options),
+        Filter(
+            "study_form",
+            "Форма обучения",
+            "study_form",
+            _enum_options(STUDY_FORM_LABELS),
+            all_label="— любая —",
+        ),
+    ],
     fields=[
         Field("campus_id", "Филиал", kind="select", required=True, options=_campus_options),
         Field(
