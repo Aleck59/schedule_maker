@@ -1,96 +1,150 @@
 {% extends "admin/_layout.html" %}
 {% import "partials/ui.html" as ui %}
-{% block title %}Ограничения · {{ app_name }}{% endblock %}
+{% block title %}Правила расписания · {{ app_name }}{% endblock %}
 {% block content %}
-{% call ui.page_header(
-      'Правила расписания',
-      'Запреты нарушать нельзя, пожелания программа старается выполнить. Любое правило можно настроить под конкретного преподавателя, группу или дисциплину.') %}
+{% call ui.page_header('Правила расписания',
+    'Чего программа не должна нарушать, когда расставляет занятия.') %}
   <a href="/admin/constraints/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить правило</a>
 {% endcall %}
 
+{# Первым делом — то, что настроил сам человек. Общий каталог ниже:
+   он большой, и открывают его редко. #}
 <div class="card mb-3">
-  <div class="card-header"><h3 class="card-title">Ваши правила</h3></div>
-  {% if rows %}
-  <div class="table-responsive">
-    <table class="table table-vcenter card-table">
-      <thead>
-        <tr><th>Правило</th><th>К кому применяется</th><th>Настройки</th><th>Насколько строго</th><th class="w-1"></th></tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr {% if not row.rule.enabled or not row.plugin_enabled %}class="opacity-50"{% endif %}>
-          <td>
-            <a href="/admin/constraints/{{ row.rule.id }}" class="text-reset">
-              {{ row.plugin.title if row.plugin else row.rule.plugin_key }}</a>
-            {% if not row.plugin_enabled %}{{ ui.badge('дополнение отключено', 'red') }}{% endif %}
-            {% if not row.rule.enabled %}{{ ui.badge('выключено', 'secondary') }}{% endif %}
-            {% if row.rule.note %}<div class="small text-secondary">{{ row.rule.note }}</div>{% endif %}
-          </td>
-          <td>{{ row.scope_text }}</td>
-          <td class="sm-mono">
-            {% for key, value in (row.rule.params or {}).items() %}{{ key }}={{ value }}{% if not loop.last %}, {% endif %}{% endfor %}
-          </td>
-          <td>
-            <span class="badge {{ 'bg-danger text-white' if row.rule.weight >= 100 else 'bg-yellow-lt' }}"
-                  title="{{ strictness_hint(row.rule.weight) }}">{{ strictness_label(row.rule.weight) }}</span>
-          </td>
-          <td class="text-end">
-            <a href="/admin/constraints/{{ row.rule.id }}" class="btn btn-sm btn-icon">{{ ui.icon('pencil') }}</a>
-            <form method="post" action="/admin/constraints/{{ row.rule.id }}/delete" class="d-inline"
-                  onsubmit="return confirm('Удалить правило?')">
-              {{ ui.csrf(csrf_token) }}
-              <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit">{{ ui.icon('trash') }}</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card-header">
+    <h3 class="card-title">Что настроено у вас</h3>
+    {% if rows %}
+      <div class="card-actions text-secondary">
+        {{ plural(rows|length, 'правило', 'правила', 'правил') }}
+      </div>
+    {% endif %}
   </div>
+  {% if rows %}
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th>Правило</th>
+            <th>К кому</th>
+            <th>Как настроено</th>
+            <th>Насколько строго</th>
+            <th class="w-1"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr {% if not row.rule.enabled %}class="opacity-50"{% endif %}>
+              <td>
+                <a href="/admin/constraints/{{ row.rule.id }}" class="fw-bold">
+                  {{ row.plugin.title if row.plugin else 'Неизвестное правило' }}</a>
+                {% if row.plugin %}
+                  <div class="text-secondary">{{ row.plugin.description }}</div>
+                {% endif %}
+                {% if row.rule.note %}
+                  <div class="text-secondary">{{ ui.icon('info-circle') }} {{ row.rule.note }}</div>
+                {% endif %}
+                {% if not row.plugin_enabled %}
+                  <div>{{ ui.badge('дополнение выключено', 'red',
+                                   'Правило записано, но плагин отключён — оно не действует') }}</div>
+                {% endif %}
+                {% if not row.rule.enabled %}
+                  <div>{{ ui.badge('выключено', 'secondary') }}</div>
+                {% endif %}
+              </td>
+              <td>{{ row.scope_text }}</td>
+              <td>{{ describe_params(row.rule) or '—' }}</td>
+              <td>
+                {{ ui.badge(strictness_label(row.rule.weight),
+                            'red' if row.rule.weight >= 100 else 'orange',
+                            strictness_hint(row.rule.weight)) }}
+              </td>
+              <td class="sm-actions">
+                <a href="/admin/constraints/{{ row.rule.id }}" class="btn btn-sm btn-icon"
+                   title="Изменить">{{ ui.icon('pencil') }}</a>
+                <form method="post" action="/admin/constraints/{{ row.rule.id }}/delete"
+                      onsubmit="return confirm('Удалить это правило?')">
+                  {{ ui.csrf(csrf_token) }}
+                  <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit"
+                          title="Удалить">{{ ui.icon('trash') }}</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
     <div class="card-body">
-      {{ ui.empty('Своих правил пока нет',
-                  'Основные проверки — конфликты, вместимость, доступность — работают и без настройки. Их список ниже.') }}
+      {{ ui.empty('Вы пока ничего не настраивали',
+                  'И это нормально: базовые запреты работают сами. Своё правило нужно, когда у конкретного преподавателя или группы особые условия.') }}
     </div>
   {% endif %}
 </div>
 
-<div class="card">
+<div class="card" x-data="{ open: '' }">
   <div class="card-header">
     <h3 class="card-title">Какие правила бывают</h3>
+    <div class="card-actions text-secondary">
+      Разложены по смыслу — сверху то, о чём можно не думать
+    </div>
   </div>
-  <div class="card-body border-bottom py-2">
-    <p class="mb-0">
-      Правила со значком «работает всегда» действуют сами по себе. Остальные
-      нужно настроить — указать, к кому они относятся и насколько строги.
-    </p>
+
+  <div class="list-group list-group-flush">
+    {% for group in groups %}
+      <div class="list-group-item">
+        <a href="#" class="d-flex align-items-start text-reset text-decoration-none"
+           @click.prevent="open = (open === '{{ group.slug }}' ? '' : '{{ group.slug }}')">
+          <div class="flex-fill">
+            <div class="fw-bold">
+              {{ group.title }}
+              <span class="text-secondary fw-normal">
+                · {{ plural(group['items']|length, 'правило', 'правила', 'правил') }}
+              </span>
+            </div>
+            <div class="text-secondary">{{ group.description }}</div>
+          </div>
+          <span class="ms-3 text-secondary" x-show="open !== '{{ group.slug }}'">
+            {{ ui.icon('chevron-right') }}
+          </span>
+          <span class="ms-3 text-secondary" x-show="open === '{{ group.slug }}'" x-cloak>
+            {{ ui.icon('chevron-down') }}
+          </span>
+        </a>
+
+        <div x-show="open === '{{ group.slug }}'" x-cloak class="mt-3">
+          <table class="table table-sm table-vcenter mb-0">
+            <tbody>
+              {% for row in group['items'] %}
+                <tr>
+                  <td style="width: 15rem">
+                    <div class="fw-bold" title="{{ row.plugin.key }}">{{ row.plugin.title }}</div>
+                    {% if row.instances %}
+                      <div>{{ ui.badge('настроено ' ~ plural(row.instances, 'раз', 'раза', 'раз'), 'blue') }}</div>
+                    {% endif %}
+                    {% if not row.enabled %}
+                      <div>{{ ui.badge('выключено', 'secondary') }}</div>
+                    {% endif %}
+                  </td>
+                  <td>{{ row.plugin.description }}</td>
+                  <td class="w-1 text-nowrap">
+                    {% if group.slug in ('limits', 'wishes', 'plugins') or row.instances %}
+                      <a href="/admin/constraints/new?plugin_key={{ row.plugin.key }}"
+                         class="btn btn-sm">{{ ui.icon('plus') }} Настроить</a>
+                    {% else %}
+                      <span class="text-secondary">не требует настройки</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endfor %}
   </div>
-  <div class="table-responsive">
-    <table class="table table-vcenter card-table">
-      <thead>
-        <tr><th>Название</th><th>Что делает</th><th>К кому</th><th>Настроено</th><th class="w-1"></th></tr>
-      </thead>
-      <tbody>
-        {% for row in catalogue %}
-        <tr {% if not row.enabled %}class="opacity-50"{% endif %}>
-          <td>
-            {{ row.plugin.title }}
-            {% if row.always_on %}<span class="badge bg-green-lt" title="Действует само по себе">работает всегда</span>{% endif %}
-            {% if not row.enabled %}{{ ui.badge('отключён', 'red') }}{% endif %}
-            {% if user and user.is_admin %}<div class="sm-mono">{{ row.plugin.key }}</div>{% endif %}
-          </td>
-          <td>{{ row.plugin.description }}</td>
-          <td>{{ row.scope_label }}</td>
-          <td>{% if row.instances %}{{ plural(row.instances, 'раз', 'раза', 'раз') }}{% else %}
-              <span class="text-secondary">—</span>{% endif %}</td>
-          <td class="text-end">
-            <a href="/admin/constraints/new?plugin_key={{ row.plugin.key }}" class="btn btn-sm">
-              {{ ui.icon('plus') }} Настроить</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+  <div class="card-footer text-secondary">
+    Правило можно применить ко всем сразу или только к одному преподавателю,
+    группе или дисциплине — тогда оно окажется сильнее общего.
   </div>
 </div>
 {% endblock %}
