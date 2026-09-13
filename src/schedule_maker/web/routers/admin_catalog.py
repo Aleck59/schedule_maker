@@ -18,6 +18,7 @@ from schedule_maker.models import (
     Campus,
     Faculty,
     Room,
+    RoomFeature,
     Speciality,
     StudentGroup,
     Subgroup,
@@ -46,6 +47,15 @@ def _speciality_options(session: Session) -> list[tuple[int, str]]:
         (s.id, f"{s.code} {s.name}")
         for s in session.scalars(
             select(Speciality).where(Speciality.is_active).order_by(Speciality.code)
+        )
+    ]
+
+
+def _feature_options(session: Session) -> list[tuple[int, str]]:
+    return [
+        (f.id, f.display)
+        for f in session.scalars(
+            select(RoomFeature).where(RoomFeature.is_active).order_by(RoomFeature.name)
         )
     ]
 
@@ -177,8 +187,8 @@ ROOM = CrudSpec(
     model=Room,
     order_by="code",
     icon="building-community",
-    search_fields=["code", "name", "equipment"],
-    search_hint="Номер, название или оборудование",
+    search_fields=["code", "name"],
+    search_hint="Номер или название",
     filters=[
         Filter("campus", "Филиал", "campus_id", _campus_options),
         Filter("kind", "Тип", "kind", _enum_options(ROOM_KIND_LABELS), all_label="— любой —"),
@@ -196,7 +206,14 @@ ROOM = CrudSpec(
             help="Лабораторная работа не встанет в обычную аудиторию.",
         ),
         Field("capacity", "Мест", kind="number", required=True, min=1, max=1000),
-        Field("equipment", "Оборудование", help="Через запятую", in_list=False),
+        Field(
+            "features",
+            "Оборудование",
+            kind="checks",
+            options=_feature_options,
+            relation=RoomFeature,
+            help="Отмеченное можно потребовать в карточке нагрузки.",
+        ),
         Field("is_active", "Используется", kind="checkbox", default=True),
     ],
 )
@@ -323,6 +340,27 @@ GROUP = CrudSpec(
     ],
 )
 
+ROOM_FEATURE = CrudSpec(
+    slug="room-features",
+    title="Оборудование аудиторий",
+    title_one="Признак аудитории",
+    subtitle=(
+        "Проектор, компьютеры, лингафон. Отмечается в карточке аудитории, "
+        "требуется в карточке нагрузки."
+    ),
+    model=RoomFeature,
+    order_by="name",
+    icon="device-desktop",
+    search_fields=["name", "short", "note"],
+    search_hint="Название признака",
+    fields=[
+        Field("name", "Название", required=True, help="Например: компьютеры"),
+        Field("short", "Сокращение", help="Для значка на карточке пары"),
+        Field("note", "Примечание", in_list=False),
+        Field("is_active", "Используется", kind="checkbox", default=True),
+    ],
+)
+
 BELL = CrudSpec(
     slug="bells",
     title="Сетка звонков",
@@ -364,5 +402,5 @@ BELL = CrudSpec(
     ],
 )
 
-for spec in (CAMPUS, ROOM, FACULTY, SUBJECT, GROUP, BELL):
+for spec in (CAMPUS, ROOM, ROOM_FEATURE, FACULTY, SUBJECT, GROUP, BELL):
     router.include_router(make_crud_router(spec))

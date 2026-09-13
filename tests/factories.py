@@ -43,9 +43,15 @@ def add_room(
     campus_id: int = 1,
     capacity: int = 40,
     kind: RoomKind = RoomKind.SEMINAR,
+    equipment: frozenset[str] = frozenset(),
 ) -> RoomInfo:
     room = RoomInfo(
-        id=room_id, code=f"а{room_id}", campus_id=campus_id, kind=kind, capacity=capacity
+        id=room_id,
+        code=f"а{room_id}",
+        campus_id=campus_id,
+        kind=kind,
+        capacity=capacity,
+        equipment=equipment,
     )
     problem.rooms[room_id] = room
     return room
@@ -121,6 +127,7 @@ def add_demand(
     delivery: DeliveryMode = DeliveryMode.OFFLINE,
     room_kind: RoomKind = RoomKind.ANY,
     required_room_id: int | None = None,
+    features: frozenset[str] = frozenset(),
     fixed_slot: int | None = None,
     fixed_day: int | None = None,
     units: frozenset[str] | None = None,
@@ -143,6 +150,7 @@ def add_demand(
         size=size if size is not None else (group.size if group else 25),
         required_room_kind=room_kind,
         required_room_id=required_room_id,
+        required_features=features,
         fixed_slot_index=fixed_slot,
         fixed_day_of_week=fixed_day,
         target_label=group.name if group else "группа",

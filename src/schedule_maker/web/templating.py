@@ -100,6 +100,9 @@ def render(
         "user": getattr(request.state, "user", None),
         "csrf_token": getattr(request.state, "csrf_token", ""),
         "plugin_nav": _plugin_nav(),
+        # Учебный период виден на каждой странице: без этого легко
+        # править нагрузку не того семестра и заметить это через неделю.
+        "academic_session": getattr(request.state, "academic_session", None),
     }
     payload.update(context or {})
     return get_templates().TemplateResponse(request, name, payload, status_code=status_code)

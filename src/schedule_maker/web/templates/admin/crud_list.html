@@ -31,6 +31,9 @@
                   <span class="text-secondary">—</span>{% endif %}
               {% elif f.kind == 'select' %}
                 {{ options_labels.get(f.name, {}).get(item[f.name]|string, f.render_value(item)) }}
+              {% elif f.kind == 'checks' %}
+                {% for row in item[f.name] %}<span class="badge bg-blue-lt me-1">{{ row.display }}</span>
+                {% else %}<span class="text-secondary">—</span>{% endfor %}
               {% else %}
                 {{ f.render_value(item) }}
               {% endif %}

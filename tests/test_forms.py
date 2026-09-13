@@ -289,3 +289,105 @@ def test_снимок_версии(admin_client, session: Session):
     )
     assert len(copies) == 1
     assert copies[0].parent_id == version.id
+
+
+def test_оборудование_аудитории_отмечается_галочками(admin_client, session: Session):
+    """Признак — строка справочника, а не слово в свободном тексте.
+
+    Раньше «проектор» жил строкой в карточке аудитории: по нему нельзя
+    было ни искать, ни потребовать его в нагрузке.
+    """
+    from schedule_maker.models import Room, RoomFeature
+
+    admin_client.post(
+        "/admin/room-features/save",
+        data={
+            "name": "интерактивная доска",
+            "short": "доска",
+            "is_active": "on",
+            "csrf_token": csrf_of(admin_client),
+        },
+    )
+    session.expire_all()
+    признак = session.scalars(
+        select(RoomFeature).where(RoomFeature.name == "интерактивная доска")
+    ).one()
+
+    room = session.scalars(select(Room).where(Room.code == "101")).one()
+    admin_client.post(
+        "/admin/rooms/save",
+        data={
+            "id": room.id,
+            "code": room.code,
+            "name": room.name,
+            "campus_id": room.campus_id,
+            "kind": room.kind,
+            "capacity": room.capacity,
+            "features": str(признак.id),
+            "is_active": "on",
+            "csrf_token": csrf_of(admin_client),
+        },
+    )
+    session.expire_all()
+    room = session.scalars(select(Room).where(Room.code == "101")).one()
+    assert room.feature_names == frozenset({"интерактивная доска"})
+
+    # Снятая галочка убирает связь, а не строку справочника.
+    admin_client.post(
+        "/admin/rooms/save",
+        data={
+            "id": room.id,
+            "code": room.code,
+            "name": room.name,
+            "campus_id": room.campus_id,
+            "kind": room.kind,
+            "capacity": room.capacity,
+            "is_active": "on",
+            "csrf_token": csrf_of(admin_client),
+        },
+    )
+    session.expire_all()
+    assert session.scalars(select(Room).where(Room.code == "101")).one().features == []
+    assert session.get(RoomFeature, признак.id) is not None
+
+
+def test_требование_оборудования_доходит_до_правила(admin_client, session: Session):
+    """Отмеченное в нагрузке должно доехать до проверки при расстановке."""
+    from schedule_maker.models import RoomFeature, StudentGroup, Subject
+    from schedule_maker.services.problem_builder import build_problem
+
+    admin_client.post(
+        "/admin/room-features/save",
+        data={"name": "компьютеры", "is_active": "on", "csrf_token": csrf_of(admin_client)},
+    )
+    session.expire_all()
+    признак = session.scalars(select(RoomFeature).where(RoomFeature.name == "компьютеры")).one()
+
+    group = session.scalars(select(StudentGroup).where(StudentGroup.name == "ЮР-101")).first()
+    admin_client.post(
+        "/admin/demands/save",
+        data={
+            "subject_id": session.scalars(select(Subject)).first().id,
+            "target": f"group:{group.id}",
+            "teacher_id": session.scalars(select(Teacher)).first().id,
+            "lesson_type": "practice",
+            "pairs_total": "2",
+            "pairs_per_day_max": "2",
+            "week_parity": "any",
+            "delivery_mode": "offline",
+            "required_room_kind": "any",
+            "required_feature": str(признак.id),
+            "is_active": "on",
+            "csrf_token": csrf_of(admin_client),
+        },
+    )
+    session.expire_all()
+    created = session.scalars(
+        select(LessonDemand)
+        .where(LessonDemand.group_id == group.id)
+        .order_by(LessonDemand.id.desc())
+    ).first()
+    assert [f.name for f in created.required_features] == ["компьютеры"]
+
+    problem = build_problem(session)
+    assert problem.demands[created.id].required_features == frozenset({"компьютеры"})

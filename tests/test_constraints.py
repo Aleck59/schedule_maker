@@ -33,6 +33,7 @@ from schedule_maker.plugins.builtin.constraints_core.space import (
     CampusMatch,
     CampusTravelTime,
     RoomCapacity,
+    RoomFeatures,
     RoomKindMatch,
 )
 from tests.factories import (
@@ -222,6 +223,41 @@ def test_лаборатория_нужна_именно_лаборатория()
     plugin = RoomKindMatch()
     reason = plugin.check_placement(context(plugin, problem), timetable(), place(1, MONDAY, 0))
     assert reason is not None and "лаборатория" in reason.lower()
+
+
+def test_нужному_оборудованию_не_подходит_пустая_аудитория():
+    problem = make_problem()
+    add_room(problem, 1, equipment=frozenset({"проектор"}))
+    add_teacher(problem, 1)
+    add_group(problem, 1)
+    add_demand(problem, 1, features=frozenset({"проектор", "компьютеры"}))
+    plugin = RoomFeatures()
+    reason = plugin.check_placement(context(plugin, problem), timetable(), place(1, MONDAY, 0))
+    assert reason is not None and "компьютеры" in reason
+    assert "проектор" not in reason, "о том, что есть, писать не надо"
+
+
+def test_оборудование_на_месте_возражений_нет():
+    problem = make_problem()
+    add_room(problem, 1, equipment=frozenset({"проектор", "компьютеры", "доска"}))
+    add_teacher(problem, 1)
+    add_group(problem, 1)
+    add_demand(problem, 1, features=frozenset({"проектор"}))
+    plugin = RoomFeatures()
+    assert (
+        plugin.check_placement(context(plugin, problem), timetable(), place(1, MONDAY, 0)) is None
+    )
+
+
+def test_дистанционному_занятию_оборудование_не_нужно():
+    """Аудитории нет — и спрашивать про проектор не с кого."""
+    problem = make_problem()
+    add_teacher(problem, 1)
+    add_group(problem, 1)
+    add_demand(problem, 1, delivery=DeliveryMode.ONLINE, features=frozenset({"проектор"}))
+    plugin = RoomFeatures()
+    tt = timetable()
+    assert plugin.check_placement(context(plugin, problem), tt, place(1, MONDAY, 0)) is None
 
 
 def test_группа_и_аудитория_в_разных_городах():
@@ -481,6 +517,7 @@ def test_онлайн_сразу_после_очной_пары():
         RoomConflict,
         RoomCapacity,
         RoomKindMatch,
+        RoomFeatures,
         CampusMatch,
         CampusTravelTime,
         TeacherAvailability,

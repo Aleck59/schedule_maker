@@ -106,6 +106,9 @@ class DemandInfo:
     fixed_slot_index: int | None
     fixed_day_of_week: int | None
     target_label: str
+    #: Что должно быть в аудитории: «проектор», «компьютеры». Тип
+    #: аудитории отвечает «какая», признаки — «с чем».
+    required_features: frozenset[str] = frozenset()
     # Учебные единицы, которые занимает пара: "<group_id>:<номер подгруппы>".
     # Занятие на всю группу разворачивается во все её подгруппы — поэтому
     # группа со split_flag=False (одна подгруппа) всегда занята целиком.

@@ -27,6 +27,7 @@ from schedule_maker.plugins.builtin.curriculum_plan.parser import (
     PlanRow,
     name_quality,
 )
+from schedule_maker.services.sessions import current_session
 
 #: Академических часов в одной паре. Величина одинакова во всех вузах
 #: страны, но вынесена в константу: в расчёте остатка она встречается
@@ -256,6 +257,7 @@ def create_demands(session: Session, curriculum_id: int) -> tuple[int, list[str]
             continue
         session.add(
             LessonDemand(
+                session_id=current_session(session).id,
                 subject_id=item.subject_id,
                 teacher_id=item.teacher_id,
                 group_id=item.group_id,

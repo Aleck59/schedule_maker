@@ -8,6 +8,7 @@ from pathlib import Path
 import typer
 
 from schedule_maker import __version__
+from schedule_maker.config import get_settings
 
 app = typer.Typer(help="Schedule Maker — система составления расписания.", no_args_is_help=True)
 db_app = typer.Typer(help="База данных.", no_args_is_help=True)
@@ -19,16 +20,24 @@ app.add_typer(admin_app, name="admin")
 
 
 def _alembic_config():
+    """Настройка Alembic, работающая и в репозитории, и в установленном пакете.
+
+    Миграции лежат внутри пакета, а не рядом с ним. Раньше они оставались
+    в корне репозитория, и в установленном пакете их просто не было:
+    ``sm db upgrade`` молча скатывался к ``create_all()``. Тот создаёт
+    недостающие таблицы, но не добавляет колонки в существующие — и
+    обновлённая программа падала на первом же запросе к старой базе.
+    """
     from alembic.config import Config
 
-    root = Path(__file__).resolve().parents[2]
-    ini = root / "alembic.ini"
-    if ini.exists():
-        config = Config(str(ini))
-        config.set_main_option("script_location", str(root / "alembic"))
-        return config
-    # Установленный пакет: миграции не поставляются, создаём схему напрямую.
-    return None
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR))
+    config.set_main_option("sqlalchemy.url", get_settings().database_url)
+    return config
+
+
+#: Каталог с миграциями. Внутри пакета — значит, едет вместе с ним.
+MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
 
 @app.command()
@@ -40,17 +49,35 @@ def version() -> None:
 @db_app.command("upgrade")
 def db_upgrade() -> None:
     """Применить миграции (или создать схему, если миграций рядом нет)."""
-    config = _alembic_config()
-    if config is None:
-        from schedule_maker.db import get_engine
-        from schedule_maker.models import Base
-
-        Base.metadata.create_all(get_engine())
-        typer.echo("Схема создана напрямую из моделей.")
-        return
     from alembic import command
 
-    command.upgrade(config, "head")
+    from schedule_maker.db import get_engine
+    from schedule_maker.services.schema import describe_state, repair_schema
+
+    engine = get_engine()
+    state = describe_state(engine)
+
+    if state.empty:
+        command.upgrade(_alembic_config(), "head")
+        typer.echo("Схема создана, миграции применены.")
+        return
+
+    if state.unmanaged:
+        # База сделана прежней версией через create_all: таблицы есть, а
+        # учёта миграций нет. Догоняем схему по моделям и отмечаем базу
+        # как актуальную, иначе Alembic попытается создать то, что уже есть.
+        report = repair_schema(engine)
+        command.stamp(_alembic_config(), "head")
+        typer.echo(
+            "База была создана без учёта миграций. "
+            f"Добавлено таблиц: {report.tables}, колонок: {report.columns}. "
+            "Дальше обновления пойдут обычным путём."
+        )
+        for line in report.notes:
+            typer.echo(f"  {line}")
+        return
+
+    command.upgrade(_alembic_config(), "head")
     typer.echo("Миграции применены.")
 
 

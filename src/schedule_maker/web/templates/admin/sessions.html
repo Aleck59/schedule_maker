@@ -1,0 +1,158 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Учебные периоды · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Учебные периоды',
+    'Год и семестр, с которыми сейчас работает программа. Нагрузка и версии расписания принадлежат периоду; справочники — аудитории, преподаватели, дисциплины — общие.') }}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-auto">
+        <span class="sm-stat-icon sm-stat-icon-primary">{{ ui.icon('calendar-month') }}</span>
+      </div>
+      <div class="col">
+        <div class="text-secondary">Сейчас работаем с периодом</div>
+        <div class="h2 mb-0">{{ current.title }}</div>
+        <div class="text-secondary">
+          {{ current.starts_on.strftime('%d.%m.%Y') }} — {{ current.ends_on.strftime('%d.%m.%Y') }}
+          · {{ plural(current.weeks, 'учебная неделя', 'учебные недели', 'учебных недель') }}
+          {% if current.contains_today %}
+            · {{ ui.badge('идёт сейчас', 'green') }}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {{ ui.hint('Первая учебная неделя нечётная. От даты начала периода программа считает чётность недель — от неё зависят «мигающие» пары и график приездов.') }}
+  </div>
+</div>
+
+<div class="row row-cards">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Все периоды</h3></div>
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+            <tr><th>Период</th><th>Даты</th><th>Данные</th><th class="w-1"></th></tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+              <tr {% if item.is_archived %}class="opacity-50"{% endif %}>
+                <td>
+                  <div class="fw-bold">{{ item.title }}</div>
+                  {% if item.is_current %}
+                    <div>{{ ui.badge('работаем сейчас', 'blue') }}</div>
+                  {% elif item.is_archived %}
+                    <div>{{ ui.badge('в архиве', 'secondary') }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="/admin/sessions/{{ item.id }}/save"
+                        class="row g-1 align-items-center">
+                    {{ ui.csrf(csrf_token) }}
+                    <div class="col-auto">
+                      <input class="form-control form-control-sm" type="date" name="starts_on"
+                             value="{{ item.starts_on.isoformat() }}" style="width: 9.5rem">
+                    </div>
+                    <div class="col-auto">
+                      <input class="form-control form-control-sm" type="date" name="ends_on"
+                             value="{{ item.ends_on.isoformat() }}" style="width: 9.5rem">
+                    </div>
+                    <div class="col-auto">
+                      <input class="form-control form-control-sm" type="number" name="weeks"
+                             value="{{ item.weeks }}" min="1" max="52" style="width: 4.5rem"
+                             title="Учебных недель">
+                    </div>
+                    <div class="col-auto">
+                      <button class="btn btn-sm" type="submit" title="Сохранить даты">
+                        {{ ui.icon('device-floppy') }}
+                      </button>
+                    </div>
+                  </form>
+                </td>
+                <td>
+                  <div>{{ plural(demands.get(item.id, 0), 'запись', 'записи', 'записей') }} нагрузки</div>
+                  <div class="text-secondary">
+                    {{ plural(versions.get(item.id, 0), 'версия', 'версии', 'версий') }} расписания
+                  </div>
+                </td>
+                <td class="sm-actions">
+                  {% if not item.is_current %}
+                    <form method="post" action="/admin/sessions/{{ item.id }}/use">
+                      {{ ui.csrf(csrf_token) }}
+                      <button class="btn btn-sm btn-primary" type="submit">Работать с ним</button>
+                    </form>
+                    <form method="post" action="/admin/sessions/{{ item.id }}/archive">
+                      {{ ui.csrf(csrf_token) }}
+                      <button class="btn btn-sm btn-icon" type="submit"
+                              title="{{ 'Вернуть из архива' if item.is_archived else 'Убрать в архив' }}">
+                        {{ ui.icon('lock-open' if item.is_archived else 'lock') }}
+                      </button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <form class="card" method="post" action="/admin/sessions/new">
+      {{ ui.csrf(csrf_token) }}
+      <div class="card-header"><h3 class="card-title">Завести период</h3></div>
+      <div class="card-body">
+        {% if not next_exists %}
+          <p class="mb-3">
+            Следующий за текущим — <strong>{{ next_year }}/{{ next_year + 1 }},
+            {{ term_labels[next_term] }}</strong>. Даты подставлены обычные, поправьте под свой календарь.
+          </p>
+        {% endif %}
+        <div class="row">
+          <div class="col-6 mb-3">
+            <label class="form-label" for="year_start">Учебный год начинается в</label>
+            <input class="form-control" type="number" id="year_start" name="year_start"
+                   value="{{ next_year }}" min="2000" max="2100">
+            {{ ui.hint('2026 — это 2026/2027') }}
+          </div>
+          <div class="col-6 mb-3">
+            <label class="form-label" for="term">Семестр</label>
+            <select class="form-select" id="term" name="term">
+              {% for value, label in term_labels.items() %}
+                <option value="{{ value }}" {% if next_term == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6 mb-3">
+            <label class="form-label" for="new-starts">Начало</label>
+            <input class="form-control" type="date" id="new-starts" name="starts_on"
+                   value="{{ next_dates[0].isoformat() }}">
+          </div>
+          <div class="col-6 mb-3">
+            <label class="form-label" for="new-ends">Конец</label>
+            <input class="form-control" type="date" id="new-ends" name="ends_on"
+                   value="{{ next_dates[1].isoformat() }}">
+          </div>
+          <div class="col-6 mb-3">
+            <label class="form-label" for="new-weeks">Учебных недель</label>
+            <input class="form-control" type="number" id="new-weeks" name="weeks"
+                   value="{{ default_weeks }}" min="1" max="52">
+            {{ ui.hint('Без каникул и практик') }}
+          </div>
+        </div>
+        <label class="form-check">
+          <input class="form-check-input" type="checkbox" name="use_now" value="1">
+          <span class="form-check-label">Сразу начать работать с ним</span>
+        </label>
+        {{ ui.hint('Нагрузка нового периода начинается пустой: её заводят заново или создают из учебного плана.') }}
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary" type="submit">{{ ui.icon('plus') }} Завести</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -15,7 +15,13 @@ from sqlalchemy.orm import Session
 
 from schedule_maker.config import get_settings
 from schedule_maker.enums import ChangeKind, DisruptionKind, WeekParity
-from schedule_maker.models import Assignment, Disruption, ScheduleChange, Teacher
+from schedule_maker.models import (
+    AcademicSession,
+    Assignment,
+    Disruption,
+    ScheduleChange,
+    Teacher,
+)
 from schedule_maker.services.availability import (
     MAX_WEEKS_IN_MONTH,
     is_last_week_of_month,
@@ -23,19 +29,23 @@ from schedule_maker.services.availability import (
     visiting_weeks_phrase,
     week_of_month,
 )
+from schedule_maker.services.sessions import current_session
 
 
-def parity_of(day: date, first_week_is_odd: bool = True) -> str:
+def parity_of(day: date, academic: AcademicSession | None = None) -> str:
     """Чётность учебной недели для даты.
 
-    Считается по номеру недели в году: иначе пришлось бы хранить дату
-    начала семестра и следить, чтобы её не забыли проставить. Если в
-    учебной части неделя считается наоборот, это переключается настройкой
-    ``SM_FIRST_WEEK_IS_ODD``.
+    Считается от начала семестра: первая учебная неделя нечётная по
+    определению, и это ровно то, что имеют в виду в учебной части.
+    Раньше здесь стоял номер недели в году — он не требовал знать даты
+    семестра, но января хватало, чтобы сбить счёт на единицу.
+
+    Без учебного периода чётности нет: ``ANY`` означает «подходит любой
+    неделе» и не отсеет ни одной пары. Это честнее, чем угадывать.
     """
-    week = day.isocalendar().week
-    odd = (week % 2 == 1) == first_week_is_odd
-    return WeekParity.ODD if odd else WeekParity.EVEN
+    if academic is None:
+        return WeekParity.ANY
+    return academic.parity_of(day)
 
 
 def dates_of(disruption: Disruption) -> list[date]:
@@ -49,7 +59,9 @@ def day_index(day: date) -> int:
     return day.weekday()
 
 
-def matches_parity(assignment: Assignment, day: date, first_week_is_odd: bool = True) -> bool:
+def matches_parity(
+    assignment: Assignment, day: date, academic: AcademicSession | None = None
+) -> bool:
     """Идёт ли пара на этой неделе.
 
     «Мигающая» пара (раз в две недели) попадает только в свою чётность,
@@ -57,7 +69,10 @@ def matches_parity(assignment: Assignment, day: date, first_week_is_odd: bool = 
     """
     if assignment.week_parity == WeekParity.ANY:
         return True
-    return assignment.week_parity == parity_of(day, first_week_is_odd)
+    parity = parity_of(day, academic)
+    if parity == WeekParity.ANY:
+        return True  # период неизвестен — не отсеиваем ничего
+    return assignment.week_parity == parity
 
 
 @dataclass(slots=True)
@@ -122,7 +137,7 @@ def affected(session: Session, disruption: Disruption, version_id: int) -> list[
     могут быть разными.
     """
     settings = get_settings()
-    first_week_is_odd = getattr(settings, "first_week_is_odd", True)
+    academic = current_session(session)
 
     assignments = list(
         session.scalars(select(Assignment).where(Assignment.version_id == version_id))
@@ -143,7 +158,7 @@ def affected(session: Session, disruption: Disruption, version_id: int) -> list[
         for assignment in assignments:
             if assignment.day_of_week != index:
                 continue
-            if not matches_parity(assignment, day, first_week_is_odd):
+            if not matches_parity(assignment, day, academic):
                 continue
             if not _touches(assignment, disruption):
                 continue
@@ -336,7 +351,7 @@ def visit_gaps(
         return plan  # приезжает каждую неделю — снимать нечего
 
     settings = get_settings()
-    first_week_is_odd = getattr(settings, "first_week_is_odd", True)
+    academic = current_session(session)
     assignments = [
         a
         for a in session.scalars(select(Assignment).where(Assignment.version_id == version_id))
@@ -352,7 +367,7 @@ def visit_gaps(
             plan.lessons += sum(
                 1
                 for a in assignments
-                if a.day_of_week == day.weekday() and matches_parity(a, day, first_week_is_odd)
+                if a.day_of_week == day.weekday() and matches_parity(a, day, academic)
             )
         day += timedelta(days=1)
     return plan
@@ -390,8 +405,7 @@ def apply_visit_gaps(
     session.add(disruption)
     session.flush()
 
-    settings = get_settings()
-    first_week_is_odd = getattr(settings, "first_week_is_odd", True)
+    academic = current_session(session)
     assignments = [
         a
         for a in session.scalars(select(Assignment).where(Assignment.version_id == version_id))
@@ -402,7 +416,7 @@ def apply_visit_gaps(
         for assignment in assignments:
             if assignment.day_of_week != day.weekday():
                 continue
-            if not matches_parity(assignment, day, first_week_is_odd):
+            if not matches_parity(assignment, day, academic):
                 continue
             apply_change(
                 session,

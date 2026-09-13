@@ -12,37 +12,57 @@ from schedule_maker.enums import VersionStatus
 from schedule_maker.models import Assignment, ScheduleVersion
 from schedule_maker.models.base import utcnow
 from schedule_maker.plugins.hooks import fire
+from schedule_maker.services.sessions import current_session, versions_of
 
 
 def get_version(session: Session, version_id: int) -> ScheduleVersion | None:
     return session.get(ScheduleVersion, version_id)
 
 
-def list_versions(session: Session) -> list[ScheduleVersion]:
-    return list(
-        session.scalars(select(ScheduleVersion).order_by(ScheduleVersion.created_at.desc()))
+def list_versions(session: Session, *, all_sessions: bool = False) -> list[ScheduleVersion]:
+    """Версии текущего периода; ``all_sessions`` показывает и прошлые."""
+    query = (select(ScheduleVersion) if all_sessions else versions_of(session)).order_by(
+        ScheduleVersion.created_at.desc()
     )
+    return list(session.scalars(query))
 
 
 def published_version(session: Session) -> ScheduleVersion | None:
-    """Единственная опубликованная версия — её видит открытый раздел."""
+    """Опубликованная версия текущего периода — её видит открытый раздел.
+
+    Отбор по периоду обязателен: иначе после начала весеннего семестра
+    студентам продолжало бы показываться осеннее расписание, пока новое
+    не опубликуют.
+    """
     return session.scalars(
-        select(ScheduleVersion)
+        versions_of(session)
         .where(ScheduleVersion.status == VersionStatus.PUBLISHED)
         .order_by(ScheduleVersion.published_at.desc())
     ).first()
 
 
 def working_version(session: Session) -> ScheduleVersion:
-    """Черновик, с которым работает админка. Создаётся при первом обращении."""
+    """Черновик, с которым работает админка. Создаётся при первом обращении.
+
+    Черновик ищется внутри текущего учебного периода: у осени и весны
+    свои черновики, и подхватывать чужой нельзя.
+    """
+    current = current_session(session)
     draft = session.scalars(
-        select(ScheduleVersion)
+        versions_of(session, current.id)
         .where(ScheduleVersion.status == VersionStatus.DRAFT)
         .order_by(ScheduleVersion.created_at.desc())
     ).first()
     if draft is not None:
+        if draft.session_id is None:
+            draft.session_id = current.id  # достался от прежней версии программы
         return draft
-    draft = ScheduleVersion(name="Черновик", status=VersionStatus.DRAFT)
+    draft = ScheduleVersion(
+        name=f"Черновик · {current.title}",
+        status=VersionStatus.DRAFT,
+        session_id=current.id,
+        semester=current.title,
+    )
     session.add(draft)
     session.flush()
     return draft
@@ -52,6 +72,7 @@ def clone_version(session: Session, source: ScheduleVersion, name: str) -> Sched
     """Снимок версии: можно спокойно экспериментировать и вернуться назад."""
     copy = ScheduleVersion(
         name=name,
+        session_id=source.session_id,
         semester=source.semester,
         status=VersionStatus.DRAFT,
         parent_id=source.id,

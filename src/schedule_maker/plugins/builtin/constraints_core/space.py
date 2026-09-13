@@ -234,4 +234,43 @@ def _per_placement(
     return violations
 
 
-PLUGINS = [RoomCapacity, RoomKindMatch, CampusMatch, CampusTravelTime]
+class RoomFeatures(ConstraintPlugin):
+    """Занятие не встанет в аудиторию без нужного оборудования.
+
+    Тип аудитории отвечает на вопрос «какая», признаки — «с чем». Пара по
+    программированию может идти в обычной семинарской, если в ней есть
+    компьютеры, и не может — в лаборатории без них.
+    """
+
+    key: ClassVar[str] = "core.room_features"
+    title: ClassVar[str] = "Оборудование аудитории"
+    description: ClassVar[str] = (
+        "Не даёт поставить занятие в аудиторию без нужного оборудования. "
+        "Что требуется, задаётся в карточке нагрузки, что есть — в карточке "
+        "аудитории."
+    )
+    scope: ClassVar[ConstraintScope] = ConstraintScope.GLOBAL
+    always_on: ClassVar[bool] = True
+
+    def check_placement(
+        self, ctx: RuleContext, timetable: Timetable, placement: Placement
+    ) -> str | None:
+        demand = ctx.problem.demands.get(placement.demand_id)
+        if demand is None or not demand.required_features:
+            return None
+        if placement.room_id is None:
+            # Дистанционному занятию аудитория не нужна — и оборудование тоже.
+            return None
+        room = ctx.problem.rooms.get(placement.room_id)
+        if room is None:
+            return None
+        missing = demand.required_features - room.equipment
+        if not missing:
+            return None
+        return f"В {room.code} нет: {', '.join(sorted(missing))}"
+
+    def evaluate(self, ctx: RuleContext, timetable: Timetable) -> list[Violation]:
+        return _per_placement(self, ctx, timetable)
+
+
+PLUGINS = [RoomCapacity, RoomKindMatch, RoomFeatures, CampusMatch, CampusTravelTime]

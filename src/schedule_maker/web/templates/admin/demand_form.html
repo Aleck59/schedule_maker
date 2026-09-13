@@ -114,6 +114,31 @@
               {% endfor %}
             </select>
           </div>
+          <div class="mb-3">
+            <label class="form-label">Что нужно в аудитории</label>
+            {% set chosen_features = demand.required_features | map(attribute='id') | list if demand else [] %}
+            <div class="row g-2">
+              {% for f in room_features %}
+                <div class="col-6">
+                  <label class="form-check">
+                    <input class="form-check-input" type="checkbox" name="required_feature"
+                           value="{{ f.id }}" {% if f.id in chosen_features %}checked{% endif %}>
+                    <span class="form-check-label">{{ f.display }}</span>
+                  </label>
+                </div>
+              {% else %}
+                <div class="col-12">
+                  <small class="form-hint">
+                    Справочник оборудования пуст —
+                    <a href="/admin/room-features/new">добавьте признак</a>.
+                  </small>
+                </div>
+              {% endfor %}
+            </div>
+            {% if room_features %}
+              <small class="form-hint">Аудитория без отмеченного не подойдёт занятию.</small>
+            {% endif %}
+          </div>
           <div class="row">
             <div class="col-6 mb-3">
               <label class="form-label" for="fixed_day_of_week">Строго в день</label>

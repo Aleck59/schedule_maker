@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from types import SimpleNamespace
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -78,16 +79,44 @@ def create_app() -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
 
+    def _session_snapshot(db) -> SimpleNamespace | None:
+        """Текущий учебный период как простые значения.
+
+        Объект из закрытой сессии SQLAlchemy шаблону не отдать — при
+        обращении к полю он попытается сходить в базу и упадёт. Копируем
+        то немногое, что нужно шапке.
+        """
+        from schedule_maker.services.sessions import current_session
+
+        try:
+            found = current_session(db)
+            db.commit()
+        except Exception:  # база ещё не размечена — шапка обойдётся без периода
+            db.rollback()
+            return None
+        return SimpleNamespace(
+            id=found.id,
+            title=found.title,
+            starts_on=found.starts_on,
+            ends_on=found.ends_on,
+            weeks=found.weeks,
+        )
+
     @app.middleware("http")
     async def attach_user(request: Request, call_next):
         """Достать пользователя из куки и выдать токен для форм."""
         request.state.user = None
+        request.state.academic_session = None
         token = request.cookies.get(settings.session_cookie)
         if token:
             payload = read_session_token(token)
             if payload:
                 with get_session_factory()() as session:
                     request.state.user = load_user(session, int(payload["uid"]))
+                    # Период нужен каждой странице админки, поэтому
+                    # читается здесь же, одним походом в базу.
+                    if request.state.user is not None:
+                        request.state.academic_session = _session_snapshot(session)
 
         csrf = request.cookies.get(CSRF_COOKIE) or make_csrf_token()
         request.state.csrf_token = csrf
@@ -132,6 +161,7 @@ def _register_routers(app: FastAPI) -> None:
         admin_demands,
         admin_io,
         admin_plugins,
+        admin_sessions,
         admin_teachers,
         admin_users,
         admin_versions,
@@ -147,6 +177,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(admin_demands.router)
     app.include_router(admin_constraints.router)
     app.include_router(admin_builder.router)
+    app.include_router(admin_sessions.router)
     app.include_router(admin_versions.router)
     app.include_router(admin_plugins.router)
     app.include_router(admin_users.router)
