@@ -10,6 +10,7 @@ from schedule_maker.models.academic import (
 from schedule_maker.models.base import Base
 from schedule_maker.models.changes import Disruption, ScheduleChange
 from schedule_maker.models.curriculum import Curriculum, CurriculumItem
+from schedule_maker.models.holidays import Holiday
 from schedule_maker.models.org import BellSlot, Campus, CampusTravel, Faculty, Room, Subject
 from schedule_maker.models.people import Teacher, TeacherAvailability, TeacherRequest, User
 from schedule_maker.models.schedule import (
@@ -18,6 +19,7 @@ from schedule_maker.models.schedule import (
     GenerationRun,
     ScheduleVersion,
 )
+from schedule_maker.models.speciality import Speciality
 from schedule_maker.models.system import (
     AuditLog,
     ExternalBusy,
@@ -40,11 +42,13 @@ __all__ = [
     "ExternalSource",
     "Faculty",
     "GenerationRun",
+    "Holiday",
     "LessonDemand",
     "PluginState",
     "Room",
     "ScheduleChange",
     "ScheduleVersion",
+    "Speciality",
     "Stream",
     "StreamMember",
     "StudentGroup",

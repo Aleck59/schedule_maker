@@ -29,18 +29,16 @@ from schedule_maker.web.templating import render
 
 router = APIRouter(prefix="/admin/changes", tags=["Изменения расписания"])
 
-#: Насколько вперёд смотрит список изменений по умолчанию.
-HORIZON_DAYS = 30
-
 
 def _back(url: str, message: str = "", error: str = "") -> RedirectResponse:
-    query = []
-    if message:
-        query.append(f"ok={message}")
-    if error:
-        query.append(f"err={error}")
-    joined = ("?" if query else "") + "&".join(query)
-    return RedirectResponse(url + joined, status_code=status.HTTP_303_SEE_OTHER)
+    """Вернуться на страницу с сообщением для человека."""
+    return RedirectResponse(
+        forms.back_to(url, ok=message, err=error), status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+#: Насколько вперёд смотрит список изменений по умолчанию.
+HORIZON_DAYS = 30
 
 
 def _live_version(session: Session) -> int:

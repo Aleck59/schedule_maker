@@ -67,7 +67,9 @@
           ('/admin/faculties', 'Направления', 'school'),
           ('/admin/campuses', 'Филиалы', 'map-pin'),
           ('/admin/bells', 'Сетка звонков', 'clock'),
-        ] %}
+        ] + plugin_nav
+              | selectattr('section', 'eq', 'reference')
+              | map(attribute='as_tuple') | list %}
         {{ nav_group('Прочее', 'dots', reference) }}
         {{ nav_link('/admin/constraints', 'Ограничения', 'shield-lock') }}
         {{ nav_link('/admin/versions', 'Версии', 'calendar-month') }}
@@ -76,7 +78,8 @@
           {{ nav_link('/admin/plugins', 'Плагины', 'puzzle') }}
           {{ nav_link('/admin/users', 'Пользователи', 'user') }}
         {% endif %}
-        {% for item in plugin_nav %}
+        {# Справочные пункты плагинов уже ушли в «Прочее» выше. #}
+        {% for item in plugin_nav if item.section != 'reference' %}
           {{ nav_link(item.url, item.title, item.icon) }}
         {% endfor %}
       </ul>

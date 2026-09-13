@@ -9,6 +9,7 @@ from schedule_maker.enums import DeliveryMode, LessonType, RoomKind, StudyForm, 
 from schedule_maker.models.base import Base, TimestampMixin
 from schedule_maker.models.org import Campus, Faculty, Room, Subject
 from schedule_maker.models.people import Teacher
+from schedule_maker.models.speciality import Speciality
 
 
 class StudentGroup(Base, TimestampMixin):
@@ -33,8 +34,20 @@ class StudentGroup(Base, TimestampMixin):
     subgroup_count: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    #: Специальность из классификатора. Нужна переводу курса: по ней видно,
+    #: сколько лет учится группа и когда она выпускается.
+    speciality_id: Mapped[int | None] = mapped_column(
+        ForeignKey("speciality.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    #: Год набора. По нему считается, какой это курс в новом учебном году.
+    admission_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Группа отучилась. Такие не попадают в расписание и не переводятся
+    #: дальше, но остаются в базе: их расписание нужно для справок.
+    graduated: Mapped[bool] = mapped_column(Boolean, default=False)
+
     faculty: Mapped[Faculty] = relationship(lazy="joined")
     campus: Mapped[Campus] = relationship(lazy="joined")
+    speciality: Mapped[Speciality | None] = relationship(lazy="joined")
     subgroups: Mapped[list[Subgroup]] = relationship(
         back_populates="group", cascade="all, delete-orphan", order_by="Subgroup.index"
     )

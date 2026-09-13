@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import time
 from typing import Annotated, Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import Query
 from pydantic import BeforeValidator
@@ -72,3 +73,20 @@ FilterId = Annotated[int | None, BeforeValidator(_empty_to_none), Query()]
 #: То же для строковых фильтров: пустой поиск — это отсутствие поиска,
 #: чтобы `?q=` и отсутствие `q` вели себя одинаково.
 FilterText = Annotated[str, BeforeValidator(lambda v: (v or "").strip()), Query()]
+
+
+def back_to(url: str, *, ok: str = "", err: str = "") -> str:
+    """Адрес возврата с сообщением для человека.
+
+    Собирается через разбор адреса, а не склейкой строк: у адреса уже мог
+    быть параметр (`?year=2027`), и наивное добавление «?ok=…» даёт второй
+    знак вопроса — страница после этого отвечает ошибкой разбора вместо
+    списка. Текст сообщения кодируется: в нём бывают пробелы и двоеточия.
+    """
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    if ok:
+        query.append(("ok", ok))
+    if err:
+        query.append(("err", err))
+    return urlunsplit(parts._replace(query=urlencode(query)))

@@ -1,0 +1,118 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Перевод курса · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Перевод на курс старше',
+    'Конец учебного года: первый курс становится вторым, выпускной — выпускается. Сначала посмотрите, что получится.') }}
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="text-secondary">Филиал:</span>
+      <select class="form-select w-auto" name="campus" onchange="this.form.submit()">
+        <option value="">— все —</option>
+        {% for c in campuses %}
+          <option value="{{ c.id }}" {% if campus == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+
+{% if preview.empty %}
+  <div class="card">
+    <div class="card-body">
+      {{ ui.empty('Переводить некого',
+                  'Все группы либо уже выпущены, либо не обучаются. Если это не так — проверьте фильтр по филиалу.') }}
+    </div>
+  </div>
+{% else %}
+  <div class="row row-cards mb-3">
+    <div class="col-6 col-lg-4">
+      {{ ui.stat_tile('Перейдут на курс старше', preview.promoted|length, '#', 'refresh', 'primary') }}
+    </div>
+    <div class="col-6 col-lg-4">
+      {{ ui.stat_tile('Выпустятся', preview.graduating|length, '#', 'school', 'green') }}
+    </div>
+    <div class="col-6 col-lg-4">
+      {{ ui.stat_tile('Останутся как есть', preview.blocked|length, '#', 'lock', 'secondary') }}
+    </div>
+  </div>
+
+  <form method="post" action="/admin/promotion">
+    {{ ui.csrf(csrf_token) }}
+    {% if campus %}<input type="hidden" name="campus" value="{{ campus }}">{% endif %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Что произойдёт</h3>
+        <div class="card-actions">
+          <label class="form-check m-0">
+            <input class="form-check-input" type="checkbox" checked
+                   onchange="document.querySelectorAll('.sm-take:not(:disabled)').forEach(c => c.checked = this.checked)">
+            <span class="form-check-label">Отметить все</span>
+          </label>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+            <tr>
+              <th class="w-1">Перевести</th>
+              <th>Группа</th>
+              <th>Специальность</th>
+              <th>Что будет</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for move in preview.moves %}
+              <tr {% if move.blocked %}class="opacity-50"{% endif %}>
+                <td>
+                  <input class="form-check-input sm-take" type="checkbox" name="group"
+                         value="{{ move.group.id }}"
+                         {% if not move.blocked %}checked{% else %}disabled{% endif %}>
+                </td>
+                <td>
+                  <div class="fw-bold">{{ move.group.name }}</div>
+                  <div class="text-secondary">
+                    {{ move.group.course }} курс · {{ move.group.campus.name }}
+                  </div>
+                </td>
+                <td>
+                  {% if move.group.speciality %}
+                    {{ move.group.speciality.code }}
+                    <div class="text-secondary">
+                      учится {{ plural(move.group.speciality.years, 'год', 'года', 'лет') }}
+                    </div>
+                  {% else %}
+                    <span class="text-secondary">не выбрана</span>
+                    <div class="text-secondary">выпуск после 6 курса</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if move.blocked %}
+                    {{ ui.badge(move.reason, 'secondary') }}
+                  {% elif move.graduates %}
+                    {{ ui.badge('выпускается', 'green') }}
+                  {% else %}
+                    {{ ui.badge(move.action, 'blue') }}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer d-flex">
+        <span class="text-secondary">
+          Выпускные группы уходят в архив, а не удаляются: их расписание нужно
+          для справок. Отменить перевод можно только вручную.
+        </span>
+        <button class="btn btn-primary ms-auto" type="submit"
+                onclick="return confirm('Перевести отмеченные группы? Отменить это можно будет только вручную.')">
+          {{ ui.icon('refresh') }} Перевести
+        </button>
+      </div>
+    </div>
+  </form>
+{% endif %}
+{% endblock %}

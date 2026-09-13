@@ -1,0 +1,123 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Направления подготовки · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Направления подготовки',
+    'Коды и названия специальностей из государственного перечня. Отсюда группа получает специальность, а перевод курса — срок обучения.') }}
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-lg">
+        <label class="form-label" for="q">Поиск</label>
+        <div class="input-icon">
+          <span class="input-icon-addon">{{ ui.icon('search') }}</span>
+          <input type="search" class="form-control" id="q" name="q" value="{{ query }}"
+                 placeholder="Код или название" autocomplete="off">
+        </div>
+      </div>
+      <div class="col-6 col-lg-auto">
+        <label class="form-label" for="level">Уровень</label>
+        <select class="form-select" id="level" name="level" onchange="this.form.submit()">
+          <option value="">— любой —</option>
+          {% for key, (label, _years) in levels.items() %}
+            <option value="{{ key }}" {% if level == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary" type="submit">Показать</button>
+      </div>
+      {% if query or level %}
+        <div class="col-auto">
+          <a href="/admin/specialities" class="btn btn-link px-1">Сбросить</a>
+        </div>
+      {% endif %}
+      <div class="col-12 col-lg-auto ms-lg-auto text-secondary small">
+        {% if items|length != total %}
+          Показано {{ items|length }} из {{ plural(total, 'направления', 'направлений', 'направлений') }}
+        {% else %}
+          {{ plural(total, 'направление', 'направления', 'направлений') }}
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row row-cards">
+  <div class="col-lg-8">
+    <div class="card">
+      {% if items %}
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr><th>Код</th><th>Название</th><th>Уровень</th><th>Срок</th><th class="w-1"></th></tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+                <tr>
+                  <td class="sm-mono">{{ item.code }}</td>
+                  <td>{{ item.name }}</td>
+                  <td>{{ levels.get(item.level, (item.level, 0))[0] }}</td>
+                  <td>{{ plural(item.years, 'год', 'года', 'лет') }}</td>
+                  <td class="sm-actions">
+                    <form method="post" action="/admin/specialities/{{ item.id }}/delete"
+                          onsubmit="return confirm('Удалить «{{ item.code }}»? Группы, привязанные к нему, останутся без специальности.')">
+                      {{ ui.csrf(csrf_token) }}
+                      <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit"
+                              title="Удалить">{{ ui.icon('trash') }}</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body">
+          {{ ui.empty('Справочник пуст',
+                      'Заполните стартовым набором или загрузите перечень файлом — оба способа справа.') }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <form class="card mb-3" method="post" action="/admin/specialities/starter">
+      {{ ui.csrf(csrf_token) }}
+      <div class="card-header"><h3 class="card-title">Стартовый набор</h3></div>
+      <div class="card-body">
+        <p class="mb-0">
+          Дюжина частых направлений, чтобы начать работу: информатика,
+          юриспруденция, экономика, биология, педагогика. Полный перечень —
+          несколько сотен строк, его загружают файлом.
+        </p>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn" type="submit">{{ ui.icon('plus') }} Заполнить</button>
+      </div>
+    </form>
+
+    <form class="card" method="post" action="/admin/specialities/upload"
+          enctype="multipart/form-data">
+      {{ ui.csrf(csrf_token) }}
+      <div class="card-header"><h3 class="card-title">Загрузить перечень</h3></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label" for="file">Файл CSV</label>
+          <input class="form-control" type="file" id="file" name="file" accept=".csv,.txt" required>
+        </div>
+        <p class="text-secondary mb-0">
+          Нужны колонки «Код» и «Наименование»; «Уровень» и «Срок обучения»
+          необязательны — без них срок берётся по уровню образования.
+          Разделитель и кодировка определяются сами: и UTF-8, и Windows-1251
+          подойдут.
+        </p>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary" type="submit">{{ ui.icon('upload') }} Загрузить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

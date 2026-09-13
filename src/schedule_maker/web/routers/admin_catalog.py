@@ -18,6 +18,7 @@ from schedule_maker.models import (
     Campus,
     Faculty,
     Room,
+    Speciality,
     StudentGroup,
     Subgroup,
     Subject,
@@ -33,6 +34,20 @@ def _campus_options(session: Session) -> list[tuple[int, str]]:
 
 def _faculty_options(session: Session) -> list[tuple[int, str]]:
     return [(f.id, f.name) for f in session.scalars(select(Faculty).order_by(Faculty.name))]
+
+
+def _speciality_options(session: Session) -> list[tuple[int, str]]:
+    """Специальности для формы группы.
+
+    Пока справочник не заполнен, список пуст, и поле остаётся
+    необязательным: заводить группы можно и без классификатора.
+    """
+    return [
+        (s.id, f"{s.code} {s.name}")
+        for s in session.scalars(
+            select(Speciality).where(Speciality.is_active).order_by(Speciality.code)
+        )
+    ]
 
 
 def _course_options(session: Session) -> list[tuple[int, str]]:
@@ -263,6 +278,23 @@ GROUP = CrudSpec(
         Field("name", "Название", required=True, help="Например: БИО-101"),
         Field("course", "Курс", kind="number", required=True, min=1, max=6),
         Field("faculty_id", "Направление", kind="select", required=True, options=_faculty_options),
+        Field(
+            "speciality_id",
+            "Специальность",
+            kind="select",
+            options=_speciality_options,
+            in_list=False,
+            help="Из классификатора направлений. По ней программа знает, когда группа выпускается.",
+        ),
+        Field(
+            "admission_year",
+            "Год набора",
+            kind="number",
+            min=2000,
+            max=2100,
+            in_list=False,
+            help="Необязательно. Помогает не запутаться, когда групп с похожими названиями много.",
+        ),
         Field("campus_id", "Филиал", kind="select", required=True, options=_campus_options),
         Field(
             "study_form",

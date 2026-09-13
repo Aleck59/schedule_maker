@@ -1,0 +1,159 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Праздники · {{ app_name }}{% endblock %}
+{% block content %}
+{{ ui.page_header('Праздники',
+    'Дни, когда занятий нет, и рабочие субботы взамен них. Отсюда праздник переносится в изменения расписания одним щелчком.') }}
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <span class="text-secondary me-1">Год:</span>
+      {% for y in years %}
+        <a href="/admin/holidays?year={{ y }}"
+           class="btn btn-sm {{ 'btn-primary' if y == year else '' }}">{{ y }}</a>
+      {% endfor %}
+      <a href="/admin/holidays?year={{ year + 1 }}" class="btn btn-sm btn-link">
+        {{ ui.icon('plus') }} {{ year + 1 }}
+      </a>
+    </div>
+  </div>
+</div>
+
+{% if pending %}
+  <div class="alert sm-alert-block alert-warning">
+    <h4 class="alert-title">
+      {{ plural(pending|length, 'праздник', 'праздника', 'праздников') }}
+      ещё не перенесены в расписание
+    </h4>
+    <p class="mb-2">
+      В справочнике они есть, но занятия на эти дни пока стоят как обычно.
+      Перенос создаст помеху на каждый день — дальше страница изменений сама
+      найдёт задетые занятия и предложит их отменить.
+    </p>
+    <form method="post" action="/admin/holidays/apply" class="mb-0">
+      {{ ui.csrf(csrf_token) }}
+      <input type="hidden" name="year" value="{{ year }}">
+      <button class="btn btn-warning" type="submit">
+        {{ ui.icon('alert-circle') }} Перенести в изменения расписания
+      </button>
+    </form>
+  </div>
+{% endif %}
+
+<div class="row row-cards">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Дни {{ year }} года</h3>
+        {% if items %}
+          <div class="card-actions text-secondary">
+            {{ plural(items|length, 'день', 'дня', 'дней') }}
+          </div>
+        {% endif %}
+      </div>
+      {% if items %}
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr><th>Дата</th><th>Что за день</th><th>Филиал</th><th class="w-1"></th></tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+                <tr>
+                  <td>
+                    <div class="fw-bold">{{ item.on_date.strftime('%d.%m') }}</div>
+                    <div class="text-secondary">{{ day_names[item.on_date.weekday()]|lower }}</div>
+                  </td>
+                  <td>
+                    {{ item.title }}
+                    <div>
+                      {{ ui.badge(item.kind_label, 'green' if item.is_working else 'red') }}
+                    </div>
+                    {% if item.note %}
+                      <div class="text-secondary">{{ item.note }}</div>
+                    {% endif %}
+                  </td>
+                  <td>{{ item.campus.name if item.campus else 'все' }}</td>
+                  <td class="sm-actions">
+                    <form method="post" action="/admin/holidays/{{ item.id }}/delete"
+                          onsubmit="return confirm('Убрать этот день из справочника?')">
+                      {{ ui.csrf(csrf_token) }}
+                      <button class="btn btn-sm btn-ghost-danger btn-icon" type="submit"
+                              title="Удалить">{{ ui.icon('trash') }}</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body">
+          {{ ui.empty('В ' ~ year ~ ' году дней ещё нет',
+                      'Заполните государственные праздники кнопкой справа, а переносы выходных добавьте руками.') }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <form class="card mb-3" method="post" action="/admin/holidays/fill">
+      {{ ui.csrf(csrf_token) }}
+      <input type="hidden" name="year" value="{{ year }}">
+      <div class="card-header"><h3 class="card-title">Заполнить за {{ year }} год</h3></div>
+      <div class="card-body">
+        <p class="mb-2">
+          Внесёт нерабочие праздничные дни по Трудовому кодексу: новогодние
+          каникулы, 23 февраля, 8 марта, 1 и 9 мая, 12 июня, 4 ноября.
+        </p>
+        <p class="text-secondary mb-3">
+          Переносы выходных сюда не попадут: их каждый год утверждают отдельным
+          постановлением, и угадать их нельзя — добавьте руками ниже.
+        </p>
+        <div class="mb-0">
+          <label class="form-label" for="fill-campus">Филиал</label>
+          <select class="form-select" id="fill-campus" name="campus_id">
+            <option value="">все филиалы</option>
+            {% for c in campuses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn btn-primary" type="submit">{{ ui.icon('calendar-event') }} Заполнить</button>
+      </div>
+    </form>
+
+    <form class="card" method="post" action="/admin/holidays/add">
+      {{ ui.csrf(csrf_token) }}
+      <div class="card-header"><h3 class="card-title">Добавить день</h3></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label" for="on_date">Дата</label>
+          <input class="form-control" type="date" id="on_date" name="on_date" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="title">Что за день</label>
+          <input class="form-control" id="title" name="title" required
+                 placeholder="Например: перенос выходного с 3 января">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="add-campus">Филиал</label>
+          <select class="form-select" id="add-campus" name="campus_id">
+            <option value="">все филиалы</option>
+            {% for c in campuses %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <label class="form-check">
+          <input class="form-check-input" type="checkbox" name="is_working" value="1">
+          <span class="form-check-label">Это рабочий день</span>
+        </label>
+        {{ ui.hint('Отметьте для рабочей субботы: в такой день занятия не отменяются, а наоборот идут.') }}
+      </div>
+      <div class="card-footer text-end">
+        <button class="btn" type="submit">{{ ui.icon('plus') }} Добавить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
