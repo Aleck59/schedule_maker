@@ -117,3 +117,58 @@
   </div>
 </a>
 {% endmacro %}
+
+{# Панель поиска и быстрых отборов над списком.
+
+   Форма отправляется обычным GET: отбор остаётся в адресе, его можно
+   сохранить в закладки и переслать коллеге. Кнопка «показать» нужна
+   для тех, кто вводит поиск с клавиатуры, — списки меняются и при
+   выборе в любом из полей. #}
+{% macro filter_bar(action, query="", hint="Поиск", filters=[], chosen={}, options={}, shown=0, total=0, word_one="запись", word_few="записи", word_many="записей") %}
+<div class="card mb-3 sm-filters">
+  <div class="card-body py-2">
+    <form method="get" action="{{ action }}" class="row g-2 align-items-end">
+      {% if hint %}
+        <div class="col-12 col-lg">
+          <label class="form-label" for="sm-q">Поиск</label>
+          <div class="input-icon">
+            <span class="input-icon-addon">{{ icon('search') }}</span>
+            <input type="search" class="form-control" id="sm-q" name="q"
+                   value="{{ query }}" placeholder="{{ hint }}" autocomplete="off">
+          </div>
+        </div>
+      {% endif %}
+      {% for rule in filters %}
+        <div class="col-6 col-lg-auto">
+          <label class="form-label" for="sm-f-{{ rule.name }}">{{ rule.label }}</label>
+          <select class="form-select" id="sm-f-{{ rule.name }}" name="{{ rule.name }}"
+                  onchange="this.form.submit()">
+            <option value="">{{ rule.all_label }}</option>
+            {% for value, label in options.get(rule.name, []) %}
+              <option value="{{ value }}"
+                      {% if chosen.get(rule.name)|string == value|string %}selected{% endif %}>
+                {{ label }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endfor %}
+      <div class="col-auto">
+        <button class="btn btn-primary" type="submit">Показать</button>
+      </div>
+      {% if query or chosen.values()|select|list %}
+        <div class="col-auto">
+          <a href="{{ action }}" class="btn btn-link px-1">Сбросить</a>
+        </div>
+      {% endif %}
+      <div class="col-12 col-lg-auto ms-lg-auto text-secondary small">
+        {% if shown != total %}
+          Показано {{ shown }} из {{ plural(total, word_one, word_few, word_many) }}
+        {% else %}
+          {{ plural(total, word_one, word_few, word_many) }}
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endmacro %}

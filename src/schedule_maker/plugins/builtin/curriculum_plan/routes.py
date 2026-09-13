@@ -23,6 +23,14 @@ from schedule_maker.web.templating import render
 
 router = APIRouter(prefix="/admin/plan", tags=["Учебный план"])
 
+
+def _back(url: str, message: str = "", error: str = "") -> RedirectResponse:
+    """Вернуться на страницу с сообщением для человека."""
+    return RedirectResponse(
+        forms.back_to(url, ok=message, err=error), status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
 #: Разобранные документы до подтверждения. В базу они не попадают:
 #: пока человек не нажал «сохранить», это ничьи данные. Ключ — номер
 #: загрузки, чтобы две вкладки не мешали друг другу.
@@ -38,16 +46,6 @@ def _stash(source_name: str, doc: Any) -> int:
         _pending.pop(old, None)
     _pending[_next_id] = (source_name, doc)
     return _next_id
-
-
-def _back(url: str, message: str = "", error: str = "") -> RedirectResponse:
-    query = []
-    if message:
-        query.append(f"ok={message}")
-    if error:
-        query.append(f"err={error}")
-    joined = ("?" if query else "") + "&".join(query)
-    return RedirectResponse(url + joined, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("", include_in_schema=False)

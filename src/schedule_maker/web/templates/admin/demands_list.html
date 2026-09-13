@@ -8,34 +8,9 @@
   <a href="/admin/demands/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить занятия</a>
 {% endcall %}
 
-<div class="card mb-3">
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-4">
-        <label class="form-label" for="f-group">Группа</label>
-        <select class="form-select" id="f-group" name="group">
-          <option value="">— все —</option>
-          {% for g in groups %}
-            <option value="{{ g.id }}" {% if filter_group == g.id %}selected{% endif %}>{{ g.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label" for="f-teacher">Преподаватель</label>
-        <select class="form-select" id="f-teacher" name="teacher">
-          <option value="">— все —</option>
-          {% for t in teachers %}
-            <option value="{{ t.id }}" {% if filter_teacher == t.id %}selected{% endif %}>{{ t.short_name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-4">
-        <button class="btn btn-primary" type="submit">{{ ui.icon('filter') }} Показать</button>
-        <a href="/admin/demands" class="btn btn-link">Сбросить</a>
-      </div>
-    </form>
-  </div>
-</div>
+{{ ui.filter_bar('/admin/demands', query, 'Дисциплина, группа или преподаватель',
+                 filters, chosen, filter_options,
+                 demands|length, total, 'запись', 'записи', 'записей') }}
 
 <div class="card">
   <div class="card-header">

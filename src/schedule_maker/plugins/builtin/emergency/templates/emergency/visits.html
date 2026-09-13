@@ -1,0 +1,94 @@
+{% extends "admin/_layout.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}График приездов · {{ app_name }}{% endblock %}
+{% block content %}
+{% call ui.page_header('График приездов',
+    'Преподаватель бывает не каждую неделю. Сетка расписания этого не умеет — занятия в ней стоят еженедельно; здесь они снимаются на те даты, когда преподавателя нет.',
+    teacher.full_name) %}
+  <a href="/admin/teachers/{{ teacher.id }}" class="btn">{{ ui.icon('arrow-left') }} К карточке</a>
+{% endcall %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-auto">
+        <div class="text-secondary">Приезжает</div>
+        <div class="fw-bold">{{ weeks_phrase }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Дней без него в периоде</div>
+        <div class="fw-bold">{{ plan.absent_dates | length }}</div>
+      </div>
+      <div class="col-auto">
+        <div class="text-secondary">Занятий снимется</div>
+        <div class="fw-bold">{{ plan.lessons }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not plan.weeks %}
+  <div class="alert sm-alert-block alert-info">
+    <h4 class="alert-title">Снимать нечего</h4>
+    <p class="mb-0">
+      В карточке преподавателя не отмечены недели месяца — значит, он приезжает
+      каждую неделю, и расписание верно как есть.
+      <a href="/admin/teachers/{{ teacher.id }}">Открыть карточку</a>.
+    </p>
+  </div>
+{% elif plan.empty %}
+  <div class="alert sm-alert-block alert-warning">
+    <h4 class="alert-title">В этот период занятий нет</h4>
+    <p class="mb-0">
+      У преподавателя нет пар в выбранном периоде — снимать нечего.
+      Возможно, расписание ещё не составлено или не опубликовано.
+    </p>
+  </div>
+{% endif %}
+
+<form method="post" action="/admin/changes/visits/{{ teacher.id }}">
+  {{ ui.csrf(csrf_token) }}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Период</h3></div>
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label" for="since">С</label>
+          <input class="form-control" type="date" id="since" name="since"
+                 value="{{ since.isoformat() }}">
+        </div>
+        <div class="col-auto">
+          <label class="form-label" for="until">По</label>
+          <input class="form-control" type="date" id="until" name="until"
+                 value="{{ until.isoformat() }}">
+        </div>
+        <div class="col-auto">
+          <a href="/admin/changes/visits/{{ teacher.id }}?since={{ since.isoformat() }}&until={{ until.isoformat() }}"
+             class="btn">Пересчитать</a>
+        </div>
+      </div>
+      {{ ui.hint('По умолчанию — ближайшие четыре месяца, то есть семестр.') }}
+
+      {% if plan.absent_dates %}
+        <div class="mt-3">
+          <div class="form-label">Дни, когда преподавателя нет</div>
+          <div class="d-flex flex-wrap gap-1">
+            {% for day in plan.absent_dates %}
+              {{ ui.badge(day.strftime('%d.%m'), 'secondary') }}
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <div class="card-footer d-flex">
+      <span class="text-secondary">
+        Отмены запишутся одной причиной — снять их потом можно тоже разом.
+      </span>
+      <button class="btn btn-primary ms-auto" type="submit" {% if plan.empty %}disabled{% endif %}>
+        {{ ui.icon('calendar-event') }}
+        Снять {{ plural(plan.lessons, 'занятие', 'занятия', 'занятий') }}
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

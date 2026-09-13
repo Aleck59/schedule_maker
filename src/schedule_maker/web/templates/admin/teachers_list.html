@@ -8,6 +8,10 @@
   <a href="/admin/teachers/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить преподавателя</a>
 {% endcall %}
 
+{{ ui.filter_bar('/admin/teachers', query, 'ФИО или кафедра',
+                 filters, chosen, filter_options,
+                 rows|length, total, 'преподаватель', 'преподавателя', 'преподавателей') }}
+
 <div class="card">
   <div class="table-responsive">
     <table class="table table-vcenter card-table table-hover">

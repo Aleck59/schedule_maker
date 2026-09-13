@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
@@ -15,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from schedule_maker.deps import db_session, require_staff, verify_csrf
-from schedule_maker.enums import ConstraintScope
+from schedule_maker.enums import ConstraintScope, plural
 from schedule_maker.models import (
     Campus,
     ConstraintRule,
@@ -114,6 +115,150 @@ def scope_label(session: Session, rule: ConstraintRule) -> str:
     return options.get(rule.scope_id, f"#{rule.scope_id}")
 
 
+#: Правила, разложенные по смыслу. Плоский алфавитный список из двух
+#: десятков строк человек не читает — он его пролистывает и закрывает.
+#: Порядок групп — от «можно не думать» к «стоит подумать».
+GROUPS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    (
+        "automatic",
+        "Программа следит за этим сама",
+        "Это физические запреты: преподаватель не может вести две пары разом, "
+        "а группа — сидеть в двух аудиториях. Их не нужно включать и нельзя "
+        "выключить: расписание без них не имело бы смысла.",
+        (
+            "core.teacher_conflict",
+            "core.group_conflict",
+            "core.room_conflict",
+            "core.room_capacity",
+            "core.room_kind",
+            "core.campus_match",
+            "core.campus_travel",
+            "core.teacher_availability",
+            "core.external_busy",
+            "core.fixed_time_slot",
+        ),
+    ),
+    (
+        "checks",
+        "Проверки перед составлением",
+        "Эти правила ничего не запрещают, а заранее считают, сойдётся ли "
+        "расписание вообще: хватит ли преподавателю дней, а филиалу — аудиторий. "
+        "Что они нашли, видно на странице «Диагностика».",
+        (
+            "core.teacher_workload",
+            "core.group_workload",
+            "core.room_supply",
+        ),
+    ),
+    (
+        "limits",
+        "Пределы, которые вы задаёте",
+        "Сколько пар в день выдерживает группа, сколько дней подряд приезжает "
+        "вахтовик, как часто можно ставить одну дисциплину. У этих правил есть "
+        "числа, и числа эти в каждом вузе свои.",
+        (
+            "core.teacher_max_daily",
+            "core.group_max_daily",
+            "core.max_per_day_subject",
+            "core.teacher_block_days",
+            "core.teacher_max_working_days",
+            "core.min_days_between",
+        ),
+    ),
+    (
+        "wishes",
+        "Пожелания: что делать, когда есть выбор",
+        "Расписание почти всегда можно составить несколькими способами. "
+        "Эти правила говорят, какой из них лучше. Если иначе не складывается, "
+        "программа ими поступится — и честно скажет, чем именно.",
+        (
+            "core.group_no_windows",
+            "core.teacher_no_windows",
+            "core.prefer_same_room",
+            "core.online_offline_mix",
+        ),
+    ),
+)
+
+
+def group_catalogue(catalogue: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Разложить правила по смысловым группам.
+
+    Правило, не попавшее ни в одну группу, пришло из стороннего плагина.
+    Такие собираются в конце: прятать их нельзя, а угадывать за автора,
+    куда их положить, неправильно.
+    """
+    by_key = {item["plugin"].key: item for item in catalogue}
+    result: list[dict[str, Any]] = []
+    placed: set[str] = set()
+    for slug, title, description, keys in GROUPS:
+        items = [by_key[key] for key in keys if key in by_key]
+        placed.update(key for key in keys if key in by_key)
+        if items:
+            result.append(
+                {"slug": slug, "title": title, "description": description, "items": items}
+            )
+    extra = [item for key, item in by_key.items() if key not in placed]
+    if extra:
+        result.append(
+            {
+                "slug": "plugins",
+                "title": "Из дополнений",
+                "description": "Правила, которые принесли установленные плагины.",
+                "items": extra,
+            }
+        )
+    return result
+
+
+#: Как назвать настройку правила по-человечески. Ключ — пара «правило и
+#: поле»: одно и то же имя значит в разных правилах разное. `days` у
+#: «Блока дней подряд» — длина блока, а у «Максимума рабочих дней» —
+#: сколько всего дней можно занять.
+PARAM_PHRASES: dict[tuple[str, str], Callable[[int], str]] = {
+    ("core.teacher_block_days", "days"): lambda v: (
+        f"блок из {plural(v, 'дня', 'дней', 'дней')} подряд"
+    ),
+    ("core.teacher_max_working_days", "days"): lambda v: (
+        f"не больше {plural(v, 'дня', 'дней', 'дней')} в неделю"
+    ),
+    ("core.teacher_max_daily", "max_pairs"): lambda v: (
+        f"не больше {plural(v, 'пары', 'пар', 'пар')} в день"
+    ),
+    ("core.group_max_daily", "max_pairs"): lambda v: (
+        f"не больше {plural(v, 'пары', 'пар', 'пар')} в день"
+    ),
+    ("core.min_days_between", "min_days"): lambda v: (
+        f"не меньше {plural(v, 'дня', 'дней', 'дней')} между парами"
+    ),
+    ("core.group_no_windows", "max_windows_per_day"): lambda v: (
+        f"терпим {plural(v, 'окно', 'окна', 'окон')} в день"
+    ),
+    ("core.teacher_no_windows", "max_windows_per_day"): lambda v: (
+        f"терпим {plural(v, 'окно', 'окна', 'окон')} в день"
+    ),
+    ("core.campus_travel", "extra_minutes"): lambda v: f"запас {v} минут на дорогу",
+    ("core.room_capacity", "tolerance_percent"): lambda v: f"перегруз до {v}%",
+}
+
+
+def describe_params(rule: ConstraintRule) -> str:
+    """Настройки правила словами, а не как «max_pairs=5».
+
+    Имя поля в базе человеку ничего не говорит; ему нужно прочитать, что
+    именно он когда-то настроил. Незнакомое поле показывается как есть —
+    это лучше, чем промолчать о настройке стороннего плагина.
+    """
+    parts = []
+    for key, value in (rule.params or {}).items():
+        phrase = PARAM_PHRASES.get((rule.plugin_key, key))
+        if phrase is not None and isinstance(value, int) and not isinstance(value, bool):
+            parts.append(phrase(value))
+        else:
+            parts.append(f"{key}: {value}")
+    return "; ".join(parts)
+
+
 @router.get("", include_in_schema=False)
 def list_constraints(
     request: Request, session: Session = Depends(db_session), user=Depends(require_staff)
@@ -143,7 +288,15 @@ def list_constraints(
         }
         for plugin in sorted(plugins.values(), key=lambda p: p.title)
     ]
-    return render(request, "admin/constraints_list.html", {"rows": rows, "catalogue": catalogue})
+    return render(
+        request,
+        "admin/constraints_list.html",
+        {
+            "rows": rows,
+            "groups": group_catalogue(catalogue),
+            "describe_params": describe_params,
+        },
+    )
 
 
 @router.get("/new", include_in_schema=False)

@@ -15,6 +15,7 @@ from schedule_maker.config import get_settings
 from schedule_maker.deps import db_session, require_staff, verify_csrf
 from schedule_maker.enums import DeliveryMode, LessonType, RoomKind, WeekParity
 from schedule_maker.models import (
+    Campus,
     LessonDemand,
     Room,
     Stream,
@@ -25,9 +26,47 @@ from schedule_maker.models import (
 from schedule_maker.services.audit import log_action
 from schedule_maker.services.problem_builder import build_slot_grid
 from schedule_maker.web import forms
+from schedule_maker.web.crud import Filter, matches_search, normalize
 from schedule_maker.web.templating import render
 
 router = APIRouter(prefix="/admin/demands", tags=["Учебный план"])
+
+
+#: Отборы над списком нагрузки. Филиал и курс берутся у слушателей:
+#: у самой строки их нет, они есть у групп, которым она читается.
+FILTERS = [
+    Filter(
+        "campus",
+        "Филиал",
+        "",
+        lambda s: [(c.id, c.name) for c in s.scalars(select(Campus).order_by(Campus.name))],
+    ),
+    Filter(
+        "course",
+        "Курс",
+        "",
+        lambda s: [
+            (course, f"{course} курс")
+            for course in sorted(set(s.scalars(select(StudentGroup.course))))
+        ],
+    ),
+    Filter(
+        "group",
+        "Группа",
+        "",
+        lambda s: [
+            (g.id, g.name) for g in s.scalars(select(StudentGroup).order_by(StudentGroup.name))
+        ],
+    ),
+    Filter(
+        "teacher",
+        "Преподаватель",
+        "",
+        lambda s: [
+            (t.id, t.short_name) for t in s.scalars(select(Teacher).order_by(Teacher.full_name))
+        ],
+    ),
+]
 
 
 @router.get("", include_in_schema=False)
@@ -35,33 +74,89 @@ def list_demands(
     request: Request,
     session: Session = Depends(db_session),
     user=Depends(require_staff),
-    group: int | None = None,
-    teacher: int | None = None,
+    group: forms.FilterId = None,
+    teacher: forms.FilterId = None,
+    campus: forms.FilterId = None,
+    course: forms.FilterId = None,
+    q: forms.FilterText = "",
 ):
     query = select(LessonDemand).order_by(LessonDemand.id)
     if teacher:
         query = query.where(LessonDemand.teacher_id == teacher)
     demands = list(session.scalars(query))
+    total = len(demands)
+
     if group:
+        demands = [d for d in demands if _serves_group(d, group)]
+    if campus or course:
+        demands = [
+            d for d in demands if _matches_audience(session, d, campus=campus, course=course)
+        ]
+    if q:
         demands = [
             d
             for d in demands
-            if d.group_id == group
-            or (d.subgroup and d.subgroup.group_id == group)
-            or (d.stream and any(m.group_id == group for m in d.stream.members))
+            if matches_search(d.subject, ["name", "short"], q)
+            or (d.teacher and matches_search(d.teacher, ["full_name"], q))
+            or normalize(q) in normalize(d.target_label)
         ]
+
+    chosen = {"campus": campus, "course": course, "group": group, "teacher": teacher}
     return render(
         request,
         "admin/demands_list.html",
         {
             "demands": demands,
+            "total": total,
+            "query": q,
+            "filters": FILTERS,
+            "chosen": chosen,
+            "filter_options": {rule.name: list(rule.options(session)) for rule in FILTERS},
             "groups": list(session.scalars(select(StudentGroup).order_by(StudentGroup.name))),
             "teachers": list(session.scalars(select(Teacher).order_by(Teacher.full_name))),
-            "filter_group": group,
-            "filter_teacher": teacher,
             "total_pairs": sum(d.pairs_total for d in demands),
         },
     )
+
+
+def _serves_group(demand: LessonDemand, group_id: int) -> bool:
+    """Идёт ли эта нагрузка у группы — прямо, подгруппой или в потоке."""
+    if demand.group_id == group_id:
+        return True
+    if demand.subgroup is not None and demand.subgroup.group_id == group_id:
+        return True
+    if demand.stream is not None:
+        return any(member.group_id == group_id for member in demand.stream.members)
+    return False
+
+
+def _audience(session: Session, demand: LessonDemand) -> list[StudentGroup]:
+    """Группы, которые слушают эту нагрузку."""
+    if demand.group is not None:
+        return [demand.group]
+    if demand.subgroup is not None and demand.subgroup.group is not None:
+        return [demand.subgroup.group]
+    if demand.stream is not None:
+        ids = [member.group_id for member in demand.stream.members]
+        return list(session.scalars(select(StudentGroup).where(StudentGroup.id.in_(ids))))
+    return []
+
+
+def _matches_audience(
+    session: Session, demand: LessonDemand, *, campus: int | None, course: int | None
+) -> bool:
+    """Отбор по филиалу и курсу идёт через слушателей.
+
+    У самой строки нагрузки ни филиала, ни курса нет — они есть у групп,
+    которым она читается. Потоковой лекции достаточно одной подходящей
+    группы: она действительно идёт в этом филиале.
+    """
+    groups = _audience(session, demand)
+    if not groups:
+        return False
+    if campus and not any(g.campus_id == campus for g in groups):
+        return False
+    return not (course and not any(g.course == course for g in groups))
 
 
 @router.get("/new", include_in_schema=False)

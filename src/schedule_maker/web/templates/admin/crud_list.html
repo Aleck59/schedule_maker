@@ -6,6 +6,11 @@
   <a href="{{ spec.base_url }}/new" class="btn btn-primary">{{ ui.icon('plus') }} Добавить</a>
 {% endcall %}
 
+{% if spec.search_fields or spec.filters %}
+  {{ ui.filter_bar(spec.base_url, query, spec.search_hint if spec.search_fields else '',
+                   spec.filters, chosen, filter_options, items|length, total) }}
+{% endif %}
+
 <div class="card">
   {% if items %}
   <div class="table-responsive">

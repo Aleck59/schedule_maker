@@ -331,8 +331,16 @@ class NavItem:
     title: str
     url: str
     icon: str = "puzzle"
+    #: «plugins» — отдельный пункт меню, «reference» — внутрь вкладки
+    #: «Прочее» к остальным справочникам. Справочники открывают редко, и
+    #: держать их в первом ряду значит отодвигать вниз ежедневное.
     section: str = "plugins"
     roles: tuple[str, ...] = ("admin", "editor")
+
+    @property
+    def as_tuple(self) -> tuple[str, str, str]:
+        """Тройка для пункта внутри раскрывающейся группы."""
+        return (self.url, self.title, self.icon)
 
 
 @dataclass(frozen=True, slots=True)

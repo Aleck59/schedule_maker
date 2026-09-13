@@ -90,3 +90,47 @@ def test_перенос_имени_не_меняет_его_на_вид() -> Non
     """Неразрывный пробел остаётся пробелом: текст читается так же."""
     имя = "Исмаилов Т. К."
     assert keep_together(имя).replace(NBSP, " ") == имя
+
+
+# ---------------------------------------------------------------------------
+# Адрес возврата
+# ---------------------------------------------------------------------------
+
+
+def test_сообщение_добавляется_к_адресу_с_параметром() -> None:
+    """Наивная склейка давала «?year=2027?ok=…» и роняла страницу.
+
+    Второй знак вопроса делал значение `year` строкой «2027?ok=…», и
+    вместо списка человек видел ошибку разбора в виде JSON.
+    """
+    from schedule_maker.web.forms import back_to
+
+    result = back_to("/admin/holidays?year=2027", ok="Добавлено")
+    assert result.count("?") == 1
+    assert "year=2027" in result
+    assert "&ok=" in result
+
+
+def test_сообщение_кодируется() -> None:
+    """В тексте бывают пробелы и двоеточия — в адресе им не место как есть."""
+    from schedule_maker.web.forms import back_to
+
+    result = back_to("/admin/holidays", ok="Добавлено дней: 14")
+    assert " " not in result
+    assert ": " not in result
+
+
+def test_без_сообщения_адрес_не_меняется() -> None:
+    from schedule_maker.web.forms import back_to
+
+    assert back_to("/admin/changes/5") == "/admin/changes/5"
+
+
+def test_пустая_строка_фильтра_это_не_выбор() -> None:
+    """`?teacher=` — это «все», а не ошибка разбора числа."""
+    from schedule_maker.web.forms import _empty_to_none
+
+    assert _empty_to_none("") is None
+    assert _empty_to_none("   ") is None
+    assert _empty_to_none("7") == "7"
+    assert _empty_to_none(None) is None
